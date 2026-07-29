@@ -888,6 +888,46 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.add(part('cylinder',0xbfe3ff, .2,4.0,0, .18,.9,.18)); g.add(sph(0xbfe3ff,.2,4.7,0,.3));
     return g;
   }
+  function makeShiloh(){   // 1 Samuel 3 — God's house at night; the lamp of God had not yet gone out
+    const g = new THREE.Group();
+    [[-2.2,-1.6],[2.2,-1.6],[-2.2,1.6],[2.2,1.6]].forEach(p=>g.add(part('cylinder',0x8a6a3a, p[0],1.5,p[1], .16,3.0,.16))); // tent posts
+    g.add(sph(0x6d5a86, 0,3.3,0, 3.0,.7,2.3));                     // draped violet roof
+    g.add(sph(0x7d6a96, 0,2.6,-1.7, 2.6,1.3,.5));                  // back curtain
+    g.add(box(4.2,.25,3.0,0xcbb692, 0,.12,0));                     // smooth stone floor
+    g.add(part('cylinder',0xd9b14a, .9,1.0,-.6, .12,1.6,.12));     // the golden lampstand
+    g.add(sph(0xd9b14a, .9,.30,-.6, .38,.14,.38));                 // its base
+    g.add(sph(0xc79a3a, .9,1.82,-.6, .22,.10,.22));                // oil cup
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe14d}));
+    fl.scale.set(.16,.5,.16); fl.position.set(.9,2.14,-.6); fl.castShadow=false; g.add(fl);   // still-burning flame
+    const fg=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfff4c0}));
+    fg.position.set(.9,1.98,-.6); fg.scale.setScalar(.12); fg.castShadow=false; g.add(fg);
+    g.add(box(1.7,.12,.9,0x9a4f35, -1.0,.25,.5));                  // Samuel's sleeping mat
+    const s=new THREE.Group();                                     // little Samuel, sitting up and listening
+    s.add(part('capsule', 0xe8dfc8, 0,.5,0, .40,.50,.34));         // small linen robe
+    s.add(sph(0xdba876, 0,1.0,0, .20,.19,.20));                    // face
+    s.add(sph(0x2a2320,-.07,1.03,.17,.03,.035,.02), sph(0x2a2320,.07,1.03,.17,.03,.035,.02));
+    s.add(sph(0xb5695a, 0,.94,.18, .05,.02,.02));                  // smile
+    s.add(sph(0x3a2c1c, 0,1.14,-.02, .22,.12,.22));                // dark hair
+    s.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    s.position.set(-1.0,.3,.5); s.rotation.y=.5; g.add(s);
+    const glow=new THREE.PointLight(0xffe9b0, 1.5, 16); glow.position.set(.9,2.2,-.6); g.add(glow);
+    return g;
+  }
+  function makeStormBoat(){   // Mark 4 — the little fishing boat, sea gone calm, Jesus aboard
+    const g = new THREE.Group();
+    g.add(box(4.6,1.2,2.2,0x7a4b22, 0,.9,0));                      // hull
+    g.add(box(5.2,.5,2.5,0x8a5a2b, 0,1.55,0));                     // gunwale rim
+    g.add(part('capsule', 0x7a4b22, 2.5,.95,0, 2.4,.8,2.0, 0,0,Math.PI/2));   // rounded bow
+    g.add(part('capsule', 0x7a4b22,-2.5,.95,0, 2.4,.8,2.0, 0,0,Math.PI/2));   // rounded stern
+    g.add(part('cylinder',0x6b4423, .5,3.6,0, .09,3.6,.09));       // mast
+    g.add(part('cylinder',0x6b4423, .5,5.1,0, .07,2.8,.07, 0,0,Math.PI/2));   // yard arm
+    g.add(sph(0xf0e8d8, .5,4.95,0, 1.35,.28,.16));                 // furled sail
+    g.add(part('cylinder',0x8a5a2b, -2.9,1.5,.7, .07,2.2,.07, .5,0,.9));      // oar resting over the side
+    const jesus=makeNPC('jesus'); jesus.position.set(-1.0,1.5,0); g.add(jesus); // Jesus standing calm in the stern
+    [[3.6,1.2],[-3.4,-1.4],[1.2,2.6],[-1.6,2.9]].forEach(f=>{      // last soft foam of the settling waves
+      const fo=sph(0xbfe3ff, f[0],.16,f[1], .9,.20,1.1); fo.castShadow=false; g.add(fo); });
+    return g;
+  }
   function makeSinai(){   // Mount Sinai — smooth holy mountain, glowing cloud, the two stone tablets
     const g = new THREE.Group();
     g.add(sph(0xa8927a, 0,2.4,-2.4, 4.8,3.2,4.4));                 // broad rocky base
@@ -1369,6 +1409,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const jx=(Math.random()*2-1)*(WORLD_R*0.4), jz=WORLD_R*0.62;
         const jesus=makeNPC('jesus'); jesus.position.set(jx,0,jz); jesus.rotation.y=Math.PI; props.add(jesus); missionCtx.goalObj=jesus;
         say('Keep your eyes on Jesus and walk to Him! 🌊',3800);
+      } else if(mission.id==='samuel'){ // God's house at night — walk to the lamp still burning
+        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const house=makeShiloh(); house.position.set(gx,0,gz); house.rotation.y=Math.atan2(-gx,-gz); props.add(house); missionCtx.goalObj=house;
+        const eli=makeNPC('eli'); eli.position.set(3,0,3); eli.rotation.y=Math.atan2(gx-3,gz-3); props.add(eli);
+        say('Someone is calling in the night! Walk to the glowing lamp! 🕯️',4200);
+      } else if(mission.id==='storm'){ // the sea is calm again — walk out to Jesus in the boat
+        const bx=(Math.random()*2-1)*(WORLD_R*0.4), bz=WORLD_R*0.62;
+        const boat=makeStormBoat(); boat.position.set(bx,0,bz); boat.rotation.y=Math.atan2(-bx,-bz); props.add(boat); missionCtx.goalObj=boat;
+        say('Jesus said “Quiet! Be still!” — walk out to the boat! ⛵',4200);
       } else { // Jonah — the great fish waits out by the sea
         const fx=(Math.random()*2-1)*(WORLD_R*0.45), fz=WORLD_R*0.6;
         const fish=makeFish(); fish.position.set(fx,0,fz); props.add(fish); missionCtx.goalObj=fish;
@@ -1390,7 +1439,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
     else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
