@@ -689,6 +689,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       angel:    {robe:0xf7f4ea, trim:0xe8d9a0, cover:0xf7f4ea, halo:true,      skin:0xe8c49a},
       abraham:  {robe:0x7a6a9a, trim:0x4f4370, cover:0xd8c9a3, beard:0xe8e8e0, staff:true, skin:0xdba876},
       nehemiah: {robe:0x8a3f4f, trim:0x5e2a36, cover:0xc9b280,                 skin:0xdba876},
+      solomon:  {robe:0x6a3f8f, trim:0xe8c53a, cover:0xe8c53a, beard:0x3a2a1a, skin:0xdba876},
+      eli:      {robe:0x6b6053, trim:0x4a4038, cover:0xd8c9a3, beard:0xd8d4c8, staff:true, skin:0xdba876},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
 
@@ -818,6 +820,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       const core=new THREE.Mesh(ugeo('sphere'), sm); core.position.y=.55; core.scale.setScalar(.30); g.add(core);
       g.add(sph(0xfff8d8, .10,.72,.08, .06));                      // glint
       g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    } else if(kind==='gold'){                                      // gleaming gold for the temple
+      g.add(box(.64,.24,.36,0xe0b428, 0,.30,0));                   // gold bars, stacked askew
+      g.add(box(.52,.20,.30,0xf2cf4a, .08,.52,.05));
+      g.add(box(.40,.16,.24,0xe8c53a, -.06,.70,-.03));
+      const gl=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfff3c0}));
+      gl.position.set(.22,.82,.10); gl.scale.setScalar(.07); g.add(gl);  // sunlit glint
     } else if(kind==='coin'){
       g.add(part('cylinder',0xd7dbe1, 0,.42,0, .36,.09,.36, .5,0,.2));   // tilted silver coin
       g.add(part('cylinder',0xf0f3f7, 0,.47,.03, .24,.05,.24, .5,0,.2)); // bright face
@@ -1114,6 +1122,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'The woman searched her whole house! Help find all ten silver coins.',
       verse:'“Rejoice with me; I have found my lost coin.” — Luke 15:9',
       env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+    { id:'samuel', name:'Samuel Hears God', emoji:'🕯️', type:'reach',
+      goal:'God called little Samuel in the night! Walk to the glowing lamp in God’s house!',
+      verse:'“Then Samuel said, ‘Speak, for your servant is listening.’” — 1 Samuel 3:10',
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
     { id:'stones', name:"David's 5 Stones", emoji:'🪨', type:'collect', base:5, fixed:5, item:'stone',
       goal:'Gather 5 smooth stones by the stream.',
       verse:'“He chose five smooth stones from the stream.” — 1 Samuel 17:40',
@@ -1142,6 +1154,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Be kind and hard-working like Ruth — glean the golden grain!',
       verse:'“May you be richly rewarded by the Lord… under whose wings you have come to take refuge.” — Ruth 2:12',
       env:{ ground:FIELD, water:null, sky:0x9fd8ff, decor:'forest' } },
+    { id:'solomon', name:"Solomon's Golden Temple", emoji:'🏛️', type:'collect', base:9, item:'gold',
+      goal:'Help wise King Solomon gather gold to make God’s temple shine!',
+      verse:'“Solomon covered the inside of the temple with pure gold.” — 1 Kings 6:21',
+      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
     { id:'elijah', name:'Elijah & the Ravens', emoji:'🐦', type:'collect', base:8, item:'bread',
       goal:'God sent ravens with food for Elijah! Gather the bread by the brook.',
       verse:'“The ravens brought him bread… and he drank from the brook.” — 1 Kings 17:6',
@@ -1158,6 +1174,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Walk along the shore to the great fish!',
       verse:'“The Lord provided a great fish to swallow Jonah.” — Jonah 1:17',
       env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+    { id:'storm', name:'Jesus Calms the Storm', emoji:'⛵', type:'reach',
+      goal:'The wind and waves obey Jesus! Walk out to the boat where He is!',
+      verse:'“He got up, rebuked the wind and said to the waves, ‘Quiet! Be still!’ Then the wind died down and it was completely calm.” — Mark 4:39',
+      env:{ ground:SAND, water:'sea', sky:0x8fa8bd, fogFar:86, decor:'beach' } },
     { id:'pearl', name:'The Pearl of Great Price', emoji:'🦪', type:'collect', base:8, item:'pearl',
       goal:'The kingdom of heaven is like a precious treasure! Find the fine pearls along the shore!',
       verse:'“The kingdom of heaven is like a merchant looking for fine pearls. When he found one of great value, he… sold everything he had and bought it.” — Matthew 13:45-46',
@@ -1271,6 +1291,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         }
         const neh=makeNPC('nehemiah'); neh.position.set(3,0,-3); neh.rotation.y=2.6; props.add(neh);
       }
+      if(mission.id==='solomon'){ // the temple rising on its platform — pillars waiting to shine with gold
+        const ta=Math.random()*TAU, tR=WORLD_R-5;
+        const t=new THREE.Group(); t.position.set(Math.cos(ta)*tR,0,Math.sin(ta)*tR); t.rotation.y=-ta+Math.PI/2;
+        t.add(box(11,1.1,6,0xd8cba8, 0,.55,0));                                  // stone platform
+        [-3.9,-1.3,1.3,3.9].forEach(px=>{ t.add(part('cylinder',0xece2c8, px,3.0,-1.2, .55,3.9,.55));
+          const cap=sph(0xf2cf4a, px,5.15,-1.2, .72,.28,.72); cap.castShadow=false; t.add(cap); }); // gold capitals
+        t.add(box(11.4,.8,3.0,0xcaa06a, 0,5.75,-1.2));                           // cedar roof beam
+        t.add(box(2.2,3.2,.5,0x8a5a2b, 0,2.7,-2.6));                             // great doorway
+        props.add(t);
+        const sol=makeNPC('solomon'); sol.position.set(3,0,-3); sol.rotation.y=2.6; props.add(sol);
+      }
       if(mission.id==='elijah'){
         const el=makeNPC('elijah'); el.position.set(3,0,3); el.rotation.y=-2.3; props.add(el);
         for(let r=0;r<3;r++){ const rv=new THREE.Group();          // friendly ravens perched nearby
@@ -1279,7 +1310,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           rv.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
           const [rx,rz]=randPos(5); rv.position.set(rx,0,rz); rv.rotation.y=Math.random()*TAU; props.add(rv); }
       }
-      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
+      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
