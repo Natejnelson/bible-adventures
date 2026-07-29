@@ -687,6 +687,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       jacob:    {robe:0x6f8a3f, trim:0x4a5f2a, cover:0x8a6a3a,                 skin:0xdba876},
       joshua:   {robe:0x9a4f35, trim:0x6b3324, cover:0xc9b280,                 skin:0xdba876},
       angel:    {robe:0xf7f4ea, trim:0xe8d9a0, cover:0xf7f4ea, halo:true,      skin:0xe8c49a},
+      abraham:  {robe:0x7a6a9a, trim:0x4f4370, cover:0xd8c9a3, beard:0xe8e8e0, staff:true, skin:0xdba876},
+      nehemiah: {robe:0x8a3f4f, trim:0x5e2a36, cover:0xc9b280,                 skin:0xdba876},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
 
@@ -809,6 +811,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       g.add(part('torus', 0xc59a52, -.28,.30,-.10, .30,.30,.36, .4,.5,0)); // curled horn body
       g.add(sph(0xb08442, -.52,.22,-.26, .10,.09,.10));            // narrow mouthpiece tip
       g.add(sph(0xefd9a8, .16,.66,.14, .07));                      // glint on the bell
+    } else if(kind==='starbit'){                                   // a little fallen star (Abraham's promise)
+      const sm = new THREE.MeshBasicMaterial({color:0xffe98a});    // self-lit so it twinkles in the night biome
+      for(let i=0;i<4;i++){ const c=new THREE.Mesh(ugeo('cone'), sm); c.scale.set(.13,.46,.13); c.position.y=.23;
+        const arm=new THREE.Group(); arm.add(c); arm.rotation.z=i*Math.PI/2; arm.position.y=.55; g.add(arm); }
+      const core=new THREE.Mesh(ugeo('sphere'), sm); core.position.y=.55; core.scale.setScalar(.30); g.add(core);
+      g.add(sph(0xfff8d8, .10,.72,.08, .06));                      // glint
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
     } else if(kind==='coin'){
       g.add(part('cylinder',0xd7dbe1, 0,.42,0, .36,.09,.36, .5,0,.2));   // tilted silver coin
       g.add(part('cylinder',0xf0f3f7, 0,.47,.03, .24,.05,.24, .5,0,.2)); // bright face
@@ -907,6 +916,23 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     z.add(sph(0xdba876, .52,.80,0, .08));
     z.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
     z.position.set(1.5,4.4,1.1); z.rotation.y=.5; g.add(z);
+    return g;
+  }
+  function makeBurningBush(){   // Exodus 3 — aflame with holy fire, yet green and whole
+    const g = new THREE.Group();
+    g.add(part('cylinder', 0x7c5330, 0,.5,0, .26,1.0,.26));        // sturdy little trunk
+    g.add(sph(0x3f9a3f, 0,1.5,0, 1.5,1.2,1.5));                    // the bush — still perfectly green
+    g.add(sph(0x4fae48, -.9,1.2,.4, .9,.7,.9), sph(0x45a341, .9,1.3,-.3, .9,.7,.9));
+    const flames = new THREE.Group();                              // gentle flames that never burn it up
+    const fm=new THREE.MeshBasicMaterial({color:0xffb14d}), fm2=new THREE.MeshBasicMaterial({color:0xffe14d});
+    for(let i=0;i<7;i++){ const a=i*TAU/7, r=1.0+(i%2)*.35;
+      const f=new THREE.Mesh(ugeo('cone'), i%2?fm:fm2); f.scale.set(.34,.9+(i%3)*.28,.34);
+      f.position.set(Math.cos(a)*r, 2.1+(i%2)*.5, Math.sin(a)*r); flames.add(f); }
+    const top=new THREE.Mesh(ugeo('cone'), fm2); top.scale.set(.5,1.5,.5); top.position.y=3.1; flames.add(top);
+    flames.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.add(flames); g.userData.flames=flames;
+    [[-.55,.14],[.55,.14]].forEach(s=>{ const sd=sph(0x9a7a4a, s[0],.06,1.35, .30,.10,.42); sd.castShadow=false; g.add(sd); }); // sandals set aside — holy ground
+    const glow = new THREE.PointLight(0xffb860, 1.6, 16); glow.position.set(0,2.4,0); g.add(glow);
     return g;
   }
 
@@ -1068,6 +1094,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Round up the animals and lead them to the ark!',
       verse:'“Two of every kind… will come to you to be kept alive.” — Genesis 6:20',
       env:{ ground:GREEN, water:'pond', sky:0x8fd0ff, decor:'forest' } },
+    { id:'abram', name:'Abraham Counts the Stars', emoji:'✨', type:'collect', base:9, item:'starbit',
+      goal:'God promised Abraham a family as many as the stars! Gather the fallen starlight!',
+      verse:'“Look up at the sky and count the stars—if indeed you can count them… So shall your offspring be.” — Genesis 15:5',
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
     { id:'ladder', name:"Jacob's Ladder", emoji:'🪜', type:'reach',
       goal:'Jacob dreamed of a stairway to heaven! Walk to the shining stairs!',
       verse:'“He saw a stairway resting on the earth… and the angels of God were ascending and descending on it.” — Genesis 28:12',
@@ -1088,6 +1118,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Gather 5 smooth stones by the stream.',
       verse:'“He chose five smooth stones from the stream.” — 1 Samuel 17:40',
       env:{ ground:GREEN, water:'stream', sky:0x8fd0ff, decor:'forest' } },
+    { id:'bush', name:'The Burning Bush', emoji:'🔥', type:'reach',
+      goal:'God spoke to Moses from a bush that burned but never burned up! Walk to the glowing bush!',
+      verse:'“Moses saw that though the bush was on fire it did not burn up.” — Exodus 3:2',
+      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
     { id:'redsea', name:'Crossing the Red Sea', emoji:'🌊', type:'reach',
       goal:'God parted the sea! Walk the dry path to Moses on the far shore!',
       verse:'“The Israelites went through the sea on dry ground, with a wall of water on their right and on their left.” — Exodus 14:22',
@@ -1112,6 +1146,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'God sent ravens with food for Elijah! Gather the bread by the brook.',
       verse:'“The ravens brought him bread… and he drank from the brook.” — 1 Kings 17:6',
       env:{ ground:GREEN, water:'stream', sky:0x8fd0ff, decor:'forest' } },
+    { id:'nehemiah', name:'Nehemiah Builds the Wall', emoji:'🧱', type:'collect', base:9, item:'stone',
+      goal:'Help Nehemiah gather stones to rebuild the wall of Jerusalem!',
+      verse:'“So we rebuilt the wall… for the people worked with all their heart.” — Nehemiah 4:6',
+      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
     { id:'daniel', name:'Daniel & the Lions', emoji:'🙏', type:'reach',
       goal:'God kept the lions gentle — walk safely to Daniel!',
       verse:'“My God sent his angel, and he shut the mouths of the lions.” — Daniel 6:22',
@@ -1221,6 +1259,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const tc=conePart(0xa08a60, Math.cos(wa)*wR, 5.8, Math.sin(wa)*wR, 1.4,1.6); tc.castShadow=false; props.add(tc);
         const josh=makeNPC('joshua'); josh.position.set(3,0,-3); josh.rotation.y=2.6; props.add(josh);
       }
+      if(mission.id==='abram'){ // Abraham gazes up at the promise-filled sky
+        const ab=makeNPC('abraham'); ab.position.set(3,0,3); ab.rotation.y=-2.3; props.add(ab);
+      }
+      if(mission.id==='nehemiah'){ // Jerusalem's wall, half rebuilt — gaps waiting for stones
+        const wallC=0xcbb692, wa=Math.random()*TAU, wR=WORLD_R-3;
+        for(let s=-4;s<=4;s++){ if(s===-1||s===2) continue;        // the gaps still to be filled
+          const a=wa+s*0.15, wx=Math.cos(a)*wR, wz=Math.sin(a)*wR, h=1.2+((s+4)%3)*0.9;
+          const seg=box(3.0,h,1.2,wallC, wx,h/2,wz); seg.rotation.y=-a+Math.PI/2; props.add(seg);
+          if(h>2.4){ const cap=sph(0xbca57e, wx,h+.2,wz, 1.6,.4,.8); cap.rotation.y=-a+Math.PI/2; cap.castShadow=false; props.add(cap); }
+        }
+        const neh=makeNPC('nehemiah'); neh.position.set(3,0,-3); neh.rotation.y=2.6; props.add(neh);
+      }
       if(mission.id==='elijah'){
         const el=makeNPC('elijah'); el.position.set(3,0,3); el.rotation.y=-2.3; props.add(el);
         for(let r=0;r<3;r++){ const rv=new THREE.Group();          // friendly ravens perched nearby
@@ -1229,7 +1279,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           rv.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
           const [rx,rz]=randPos(5); rv.position.set(rx,0,rz); rv.rotation.y=Math.random()*TAU; props.add(rv); }
       }
-      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
+      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
@@ -1259,6 +1309,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const tree=makeSycamore(); tree.position.set(gx,0,gz); tree.rotation.y=Math.atan2(-gx,-gz); props.add(tree); missionCtx.goalObj=tree;
         const jesus=makeNPC('jesus'); jesus.position.set(3,0,3); jesus.rotation.y=Math.atan2(gx-3,gz-3); props.add(jesus);
         say('Zacchaeus climbed a tree to see Jesus! Walk to the big tree! 🌳',4200);
+      } else if(mission.id==='bush'){ // the burning bush glows out in the desert; Moses stands near the player
+        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const bush=makeBurningBush(); bush.position.set(gx,0,gz); props.add(bush); missionCtx.goalObj=bush;
+        missionCtx.starObj=bush.userData.flames;   // reuse the star spin — the flames dance slowly
+        const moses=makeNPC('moses'); moses.position.set(3,0,3); moses.rotation.y=Math.atan2(gx-3,gz-3); props.add(moses);
+        say('The bush is on fire but it never burns up! Walk to it! 🔥',4200);
       } else if(mission.id==='daniel'){ // gentle lions in the den; walk to Daniel praying safely
         const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
         const daniel=makeNPC('daniel'); daniel.position.set(gx,0,gz); daniel.rotation.y=ang+Math.PI; props.add(daniel); missionCtx.goalObj=daniel;
@@ -1301,9 +1357,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function updateGoal(){
     let sub='';
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
-    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
+    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
