@@ -684,6 +684,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       moses:    {robe:0x9b4a3a, trim:0x6b2f24, cover:0xd8c9a3, beard:0xf0f0ea, staff:true, skin:0xdba876},
       ruth:     {robe:0x7c9a4f, trim:0xe8d9a0, cover:0xc9d6e8, veil:true,      skin:0xdba876},
       elijah:   {robe:0x6b5a44, trim:0x4a3d2c, cover:0x8a7a5e, beard:0x4a3a2a, staff:true, skin:0xdba876},
+      jacob:    {robe:0x6f8a3f, trim:0x4a5f2a, cover:0x8a6a3a,                 skin:0xdba876},
+      angel:    {robe:0xf7f4ea, trim:0xe8d9a0, cover:0xf7f4ea, halo:true,      skin:0xe8c49a},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
 
@@ -794,6 +796,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       g.add(sph(0xe8bd7a, 0,.66,0, .22,.14,.20));
       g.add(part('capsule',0x4a90c2, .06,.5,.42, .12,.16,.12, Math.PI/2,0,0.3)); // little fish beside it
       g.add(conePart(0x4a90c2, -.34,.5,.42, .10,.22, Math.PI/2,0,-0.3));
+    } else if(kind==='pearl'){
+      g.add(sph(0xe0b39c, 0,.22,0, .42,.14,.36));                  // open shell base
+      g.add(sph(0xd2a28c, 0,.30,-.24, .40,.30,.14));               // shell lid tilted back
+      g.add(sph(0xf2d4c0, 0,.28,.02, .32,.08,.28));                // pale inner shell
+      const pr = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfdf4ea}));
+      pr.position.set(0,.44,.02); pr.scale.setScalar(0.22); g.add(pr);   // the shining pearl
+      g.add(sph(0xffffff, .08,.52,.10, .05));                      // glint
     } else if(kind==='coin'){
       g.add(part('cylinder',0xd7dbe1, 0,.42,0, .36,.09,.36, .5,0,.2));   // tilted silver coin
       g.add(part('cylinder',0xf0f3f7, 0,.47,.03, .24,.05,.24, .5,0,.2)); // bright face
@@ -802,6 +811,42 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       g.add(part('cylinder', 0xffe14d, 0,.85,0, .40,.10,.40));
       g.add(sph(0xfff6c8, 0,.85,0, .16));
     }
+    return g;
+  }
+  function makeStairway(){   // Jacob's dream — a soft glowing stairway rising toward heaven
+    const g = new THREE.Group();
+    const stepM = new THREE.MeshBasicMaterial({color:0xffeebc});
+    for(let s=0;s<8;s++){
+      const st = new THREE.Mesh(ugeo('capsule'), stepM);
+      st.scale.set(.26, 1.3-s*0.07, .9); st.rotation.z = Math.PI/2;   // long axis lies across the path
+      st.position.set(0, .35+s*.95, -1.2-s*.95);
+      g.add(st);
+    }
+    for(let a=0;a<2;a++){   // two little angels resting on the stairs
+      const an = new THREE.Group(); const wy=.35+(2+a*3)*.95, wz=-1.2-(2+a*3)*.95;
+      an.add(part('capsule', 0xf7f4ea, 0,.55,0, .42,.55,.36));           // white robe
+      an.add(sph(0xf0cda6, 0,1.12,0, .22,.21,.22));                      // face
+      an.add(sph(0xf7f4ea, -.42,.72,-.10, .30,.42,.10), sph(0xf7f4ea, .42,.72,-.10, .30,.42,.10)); // wings
+      const halo = new THREE.Mesh(ugeo('torus'), new THREE.MeshBasicMaterial({color:0xffe14d}));
+      halo.position.set(0,1.42,0); halo.rotation.x=Math.PI/2; halo.scale.setScalar(.32); an.add(halo);
+      an.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      an.position.set(a===0?-.9:.9, wy+.2, wz); an.rotation.y=a===0?0.5:-0.5; g.add(an);
+    }
+    const glow = new THREE.PointLight(0xffe9b0, 1.5, 22); glow.position.set(0,5,-4); g.add(glow);
+    return g;
+  }
+  function makeTomb(){   // Easter morning — the garden tomb, open and empty, stone rolled away
+    const g = new THREE.Group();
+    g.add(sph(0x9a9182, 0,1.7,-.6, 2.6,2.2,2.3));                  // smooth rock mound
+    g.add(sph(0x8a8172, -1.5,1.0,-1.0, 1.6,1.4,1.5));
+    g.add(sph(0xa39a8a, 1.5,1.1,-.9, 1.5,1.3,1.4));
+    g.add(sph(0x7e7666, 0,2.9,-1.4, 1.4,1.0,1.3));                 // mossy top
+    const dark = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0x241d14}));
+    dark.position.set(0,1.0,1.45); dark.scale.set(.85,1.05,.35); g.add(dark);   // open doorway — empty inside!
+    g.add(part('cylinder', 0xb8b0a0, 2.5,.95,1.7, .95,.34,.95, Math.PI/2,0,.4)); // the stone, rolled away
+    g.add(sph(0x5ab04f, -1.9,.35,1.4, .8,.5,.7), sph(0x63c258, 2.0,.3,.4, .6,.4,.6)); // garden bushes
+    g.add(sph(0xe8607a, -1.7,.72,1.5, .12), sph(0xffd166, 2.1,.62,.55, .11));         // little flowers
+    const glow = new THREE.PointLight(0xfff0d0, 1.2, 12); glow.position.set(0,1.4,2.2); g.add(glow);
     return g;
   }
   function makeFish(){   // Jonah's great fish — big & friendly, not scary
@@ -979,6 +1024,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Round up the animals and lead them to the ark!',
       verse:'“Two of every kind… will come to you to be kept alive.” — Genesis 6:20',
       env:{ ground:GREEN, water:'pond', sky:0x8fd0ff, decor:'forest' } },
+    { id:'ladder', name:"Jacob's Ladder", emoji:'🪜', type:'reach',
+      goal:'Jacob dreamed of a stairway to heaven! Walk to the shining stairs!',
+      verse:'“He saw a stairway resting on the earth… and the angels of God were ascending and descending on it.” — Genesis 28:12',
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
     { id:'joseph', name:'Joseph Stores the Grain', emoji:'🏺', type:'collect', base:9, item:'grain',
       goal:'Help wise Joseph store up grain in Egypt before the famine comes!',
       verse:'“Joseph stored up huge quantities of grain, like the sand of the sea.” — Genesis 41:49',
@@ -1019,6 +1068,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Walk along the shore to the great fish!',
       verse:'“The Lord provided a great fish to swallow Jonah.” — Jonah 1:17',
       env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+    { id:'pearl', name:'The Pearl of Great Price', emoji:'🦪', type:'collect', base:8, item:'pearl',
+      goal:'The kingdom of heaven is like a precious treasure! Find the fine pearls along the shore!',
+      verse:'“The kingdom of heaven is like a merchant looking for fine pearls. When he found one of great value, he… sold everything he had and bought it.” — Matthew 13:45-46',
+      env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
     { id:'feeding', name:'Feeding the 5000', emoji:'🧺', type:'collect', base:9, item:'bread',
       goal:'Gather the loaves and fish to share with everyone!',
       verse:'“He gave thanks and broke the loaves… and all ate and were satisfied.” — Matthew 14:19-20',
@@ -1035,6 +1088,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Gather palm branches to welcome Jesus the King!',
       verse:'“Hosanna! Blessed is he who comes in the name of the Lord!” — Matthew 21:9',
       env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+    { id:'tomb', name:'The Empty Tomb', emoji:'🌅', type:'reach',
+      goal:'Jesus is alive! Walk to the garden tomb and see — the stone is rolled away!',
+      verse:'“He is not here; he has risen, just as he said. Come and see the place where he lay.” — Matthew 28:6',
+      env:{ ground:LUSH, water:null, sky:0xf7cfa4, decor:'forest' } },
   ];
   const ANIMAL_TYPES = ['sheep','lion','cow','elephant','pig','giraffe','chicken','zebra'];
 
@@ -1106,7 +1163,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           rv.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
           const [rx,rz]=randPos(5); rv.position.set(rx,0,rz); rv.rotation.y=Math.random()*TAU; props.add(rv); }
       }
-      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':'Grab the manna bread! 🍞')))),4000);
+      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':'Grab the manna bread! 🍞'))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
@@ -1115,6 +1172,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const star=makeStar(gx, 12, gz); props.add(star); missionCtx.goalObj=stable; missionCtx.starObj=star;
         const mary=makeNPC('mary'); mary.position.set(gx+2.5,0,gz+1.5); mary.rotation.y=-2.2; props.add(mary);
         say('Follow the shining star! ⭐',3800);
+      } else if(mission.id==='ladder'){ // Jacob's dream — walk to the glowing stairway
+        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const stair=makeStairway(); stair.position.set(gx,0,gz); stair.rotation.y=Math.atan2(gx,gz); props.add(stair); missionCtx.goalObj=stair;
+        const jacob=makeNPC('jacob'); jacob.position.set(3,0,3); jacob.rotation.y=Math.atan2(gx-3,gz-3); props.add(jacob);
+        say('Follow the glow to the stairway from Jacob’s dream! 🪜✨',4200);
+      } else if(mission.id==='tomb'){ // Easter morning — walk to the open garden tomb
+        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const tomb=makeTomb(); tomb.position.set(gx,0,gz); tomb.rotation.y=Math.atan2(-gx,-gz); props.add(tomb); missionCtx.goalObj=tomb;
+        const angel=makeNPC('angel'); angel.position.set(gx*0.88,0,gz*0.88); angel.rotation.y=Math.atan2(-gx,-gz); props.add(angel);
+        const mary=makeNPC('mary'); mary.position.set(3,0,3); mary.rotation.y=Math.atan2(gx-3,gz-3); props.add(mary);
+        say('Jesus is risen! Walk to the empty tomb! 🌅',4200);
       } else if(mission.id==='daniel'){ // gentle lions in the den; walk to Daniel praying safely
         const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
         const daniel=makeNPC('daniel'); daniel.position.set(gx,0,gz); daniel.rotation.y=ang+Math.PI; props.add(daniel); missionCtx.goalObj=daniel;
@@ -1157,9 +1225,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function updateGoal(){
     let sub='';
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
-    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
+    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
