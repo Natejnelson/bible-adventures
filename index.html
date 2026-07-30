@@ -830,6 +830,14 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       g.add(part('cylinder',0xd7dbe1, 0,.42,0, .36,.09,.36, .5,0,.2));   // tilted silver coin
       g.add(part('cylinder',0xf0f3f7, 0,.47,.03, .24,.05,.24, .5,0,.2)); // bright face
       g.add(sph(0xffffff, .16,.58,.12, .07));                            // glint
+    } else if(kind==='fruit'){                                     // a little pile of sweet orchard fruit
+      g.add(sph(0xd94f3a, -.16,.32,.02, .24,.22,.24));             // rosy apple
+      g.add(part('cylinder',0x6b4a2b, -.16,.58,.02, .03,.14,.03)); // stem
+      g.add(sph(0xf2b53a, .20,.28,-.06, .19,.23,.19));             // golden pear
+      g.add(sph(0x8a5fc2, .04,.28,.24, .13,.13,.13));              // plums
+      g.add(sph(0x7a4fb2, .18,.24,.30, .11,.11,.11));
+      g.add(sph(0x5cc06a, -.04,.50,.18, .12,.06,.10));             // leaf
+      g.add(sph(0xffffff, -.08,.50,.10, .05));                     // glint
     } else {
       g.add(part('cylinder', 0xffe14d, 0,.85,0, .40,.10,.40));
       g.add(sph(0xfff6c8, 0,.85,0, .16));
@@ -1190,6 +1198,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'March around Jericho! Gather the trumpets so the priests can sound them!',
       verse:'“When the trumpets sounded… the wall collapsed; so everyone charged straight in, and they took the city.” — Joshua 6:20',
       env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+    { id:'gideon', name:"Gideon's Trumpets", emoji:'🎺', type:'collect', base:8, item:'horn',
+      goal:'God helped Gideon with just 300 helpers! Gather trumpets for his brave band in the night!',
+      verse:'“The three companies blew the trumpets… they shouted, ‘A sword for the Lord and for Gideon!’” — Judges 7:20',
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
     { id:'ruth', name:'Ruth Gleans the Grain', emoji:'🌾', type:'collect', base:8, item:'grain',
       goal:'Be kind and hard-working like Ruth — glean the golden grain!',
       verse:'“May you be richly rewarded by the Lord… under whose wings you have come to take refuge.” — Ruth 2:12',
@@ -1218,6 +1230,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'The wind and waves obey Jesus! Walk out to the boat where He is!',
       verse:'“He got up, rebuked the wind and said to the waves, ‘Quiet! Be still!’ Then the wind died down and it was completely calm.” — Mark 4:39',
       env:{ ground:SAND, water:'sea', sky:0x8fa8bd, fogFar:86, decor:'beach' } },
+    { id:'sower', name:'The Sower & the Seeds', emoji:'🌱', type:'collect', base:9, item:'grain',
+      goal:'Jesus told of seeds that grew big and tall on good soil! Gather the good harvest!',
+      verse:'“Still other seed fell on good soil, where it produced a crop—a hundred, sixty or thirty times what was sown.” — Matthew 13:8',
+      env:{ ground:FIELD, water:null, sky:0x9fd8ff, decor:'forest' } },
     { id:'pearl', name:'The Pearl of Great Price', emoji:'🦪', type:'collect', base:8, item:'pearl',
       goal:'The kingdom of heaven is like a precious treasure! Find the fine pearls along the shore!',
       verse:'“The kingdom of heaven is like a merchant looking for fine pearls. When he found one of great value, he… sold everything he had and bought it.” — Matthew 13:45-46',
@@ -1246,6 +1262,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Jesus is alive! Walk to the garden tomb and see — the stone is rolled away!',
       verse:'“He is not here; he has risen, just as he said. Come and see the place where he lay.” — Matthew 28:6',
       env:{ ground:LUSH, water:null, sky:0xf7cfa4, decor:'forest' } },
+    { id:'fruit', name:'Fruit of the Spirit', emoji:'🍎', type:'collect', base:9, item:'fruit',
+      goal:'God’s Spirit grows good things in you — love, joy and peace! Gather the sweet orchard fruit!',
+      verse:'“But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.” — Galatians 5:22-23',
+      env:{ ground:LUSH, water:'lake', sky:0x9fd8ff, decor:'forest' } },
   ];
   const ANIMAL_TYPES = ['sheep','lion','cow','elephant','pig','giraffe','chicken','zebra'];
 
@@ -1309,6 +1329,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           npc.position.set(x,0,-WORLD_R+4+c*0.2); npc.rotation.y=Math.random()*TAU; props.add(npc); }
       }
       if(mission.id==='ruth'){ const boaz=makeNPC('ruth'); boaz.position.set(3,0,-3); boaz.rotation.y=0.6; props.add(boaz); }
+      if(mission.id==='gideon'){ const gd=makeNPC('joshua'); gd.position.set(3,0,-3); gd.rotation.y=2.6; props.add(gd); }
+      if(mission.id==='sower'){ const fm=makeNPC('shepherd'); fm.position.set(3,0,3); fm.rotation.y=-2.3; props.add(fm); }
       if(mission.id==='jericho'){ // the great walled city waits at the edge of the world
         const wallC=0xc9b490, capC=0xb8a37e, wa=Math.random()*TAU, wR=WORLD_R-3;
         for(let s=-3;s<=3;s++){ const a=wa+s*0.16, wx=Math.cos(a)*wR, wz=Math.sin(a)*wR;
@@ -1350,7 +1372,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           rv.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
           const [rx,rz]=randPos(5); rv.position.set(rx,0,rz); rv.rotation.y=Math.random()*TAU; props.add(rv); }
       }
-      say(mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
+      say(mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
@@ -1437,7 +1459,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function updateGoal(){
     let sub='';
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
-    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
+    else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':mission.item==='gold'?'💰 ':mission.item==='fruit'?'🍎 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
     else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
