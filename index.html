@@ -691,6 +691,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       nehemiah: {robe:0x8a3f4f, trim:0x5e2a36, cover:0xc9b280,                 skin:0xdba876},
       solomon:  {robe:0x6a3f8f, trim:0xe8c53a, cover:0xe8c53a, beard:0x3a2a1a, skin:0xdba876},
       eli:      {robe:0x6b6053, trim:0x4a4038, cover:0xd8c9a3, beard:0xd8d4c8, staff:true, skin:0xdba876},
+      traveler: {robe:0x8a8378, trim:0x5e594e, cover:0xb8b0a0,                 skin:0xdba876},
+      samaritan:{robe:0x3f8a6b, trim:0x2a5f49, cover:0xd8c9a3, beard:0x4a3a2a, staff:true, skin:0xdba876},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
 
@@ -773,6 +775,23 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const core = new THREE.Mesh(ugeo('sphere'), m); core.scale.setScalar(2.2); g.add(core);
     const glow = new THREE.PointLight(0xffe14d, 2, 30); g.add(glow);
     g.position.set(x,y,z); g.scale.setScalar(1.2); return g;
+  }
+  function makeHeavenCity(){   // the New Jerusalem — a golden city that needs no sun (Revelation 21)
+    const g = new THREE.Group();
+    const glowM = new THREE.MeshBasicMaterial({color:0xffe9a0});
+    const wallM = new THREE.MeshBasicMaterial({color:0xf2cf6a});
+    g.add(box(10,1.2,8,0xd8cba8, 0,.6,0));                          // hill-top platform
+    const wall=new THREE.Mesh(boxGeo, wallM); wall.scale.set(8.6,2.2,6.6); wall.position.set(0,2.2,0); g.add(wall);
+    const gate=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfdf4ea}));
+    gate.scale.set(1.0,1.5,.4); gate.position.set(0,2.0,3.35); g.add(gate);   // a gate of pearl (Rev 21:21)
+    [[-3.2,-2.2],[3.2,-2.2],[-3.2,2.2],[3.2,2.2],[0,-1.0]].forEach((t,i)=>{
+      const h=3.4+(i===4?2.2:0);
+      const tw=new THREE.Mesh(ugeo('cylinder'), wallM); tw.scale.set(.9,h,.9); tw.position.set(t[0],1.2+h/2,t[1]); g.add(tw);
+      const cap=new THREE.Mesh(ugeo('cone'), glowM); cap.scale.set(1.1,1.4,1.1); cap.position.set(t[0],1.2+h+.7,t[1]); g.add(cap);
+    });
+    const gl=new THREE.PointLight(0xffe9a0, 2.2, 34); gl.position.set(0,6,0); g.add(gl);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    return g;
   }
   function makeSparkleItem(kind){
     // collectible items: stone, manna, palm, grain, bread, star-coin
@@ -1142,6 +1161,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const NIGHT_G = [0x2f7a3a,0x357f40,0x2a7136,0x316f3a];
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
   const MISSIONS = [
+    { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
+      goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
+      verse:'“And God said, ‘Let there be light,’ and there was light.” — Genesis 1:3',
+      env:{ ground:LUSH, water:'lake', sky:0xf7cfa4, decor:'forest' } },
     { id:'eden', name:'Garden of Eden', emoji:'🦁', type:'gather', base:6, reachLabel:'Adam 🧔',
       goal:'Gather the animals so Adam can name them!',
       verse:'“Whatever the man called each living creature, that was its name.” — Genesis 2:19',
@@ -1250,6 +1273,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'Keep your eyes on Jesus and walk across the water to Him!',
       verse:'“Take courage! It is I. Don’t be afraid.” — Matthew 14:27',
       env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+    { id:'samaritan', name:'The Good Samaritan', emoji:'💗', type:'reach',
+      goal:'A hurt traveler needs help on the lonely road! Be a kind neighbor — walk to him!',
+      verse:'“‘The one who had mercy on him.’ Jesus told him, ‘Go and do likewise.’” — Luke 10:37',
+      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
     { id:'zacchaeus', name:'Zacchaeus Meets Jesus', emoji:'🌳', type:'reach',
       goal:'Little Zacchaeus climbed a tree to see Jesus! Walk to the big sycamore tree!',
       verse:'“Zacchaeus, come down immediately. I must stay at your house today.” — Luke 19:5',
@@ -1266,6 +1293,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'God’s Spirit grows good things in you — love, joy and peace! Gather the sweet orchard fruit!',
       verse:'“But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.” — Galatians 5:22-23',
       env:{ ground:LUSH, water:'lake', sky:0x9fd8ff, decor:'forest' } },
+    { id:'heavencity', name:'The Shining City', emoji:'🌟', type:'reach',
+      goal:'One day God’s golden city will shine forever — it needs no sun! Walk to the city of God!',
+      verse:'“The city does not need the sun or the moon to shine on it, for the glory of God gives it light, and the Lamb is its lamp.” — Revelation 21:23',
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
   ];
   const ANIMAL_TYPES = ['sheep','lion','cow','elephant','pig','giraffe','chicken','zebra'];
 
@@ -1372,7 +1403,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           rv.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
           const [rx,rz]=randPos(5); rv.position.set(rx,0,rz); rv.rotation.y=Math.random()*TAU; props.add(rv); }
       }
-      say(mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
+      say(mission.id==='creation'?'God said: Let there be light! Gather the first twinkles of light! ✨':mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
@@ -1440,6 +1471,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const bx=(Math.random()*2-1)*(WORLD_R*0.4), bz=WORLD_R*0.62;
         const boat=makeStormBoat(); boat.position.set(bx,0,bz); boat.rotation.y=Math.atan2(-bx,-bz); props.add(boat); missionCtx.goalObj=boat;
         say('Jesus said “Quiet! Be still!” — walk out to the boat! ⛵',4200);
+      } else if(mission.id==='samaritan'){ // the hurt traveler waits along the lonely desert road
+        const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const trav=makeNPC('traveler'); trav.position.set(gx,0,gz); trav.rotation.y=ang+Math.PI; props.add(trav); missionCtx.goalObj=trav;
+        for(let s=1;s<6;s++){ const ms=sph(0xcbb692, gx*s/6+Math.sin(s*2.1)*1.6, .28, gz*s/6+Math.cos(s*1.7)*1.6, .34,.24,.30);
+          ms.castShadow=false; props.add(ms); }   // dusty milestones mark the Jericho road
+        const sam=makeNPC('samaritan'); sam.position.set(3,0,3); sam.rotation.y=Math.atan2(gx-3,gz-3); props.add(sam);
+        say('Someone is hurt by the road! Walk to him and be a kind helper! 💗',4200);
+      } else if(mission.id==='heavencity'){ // the New Jerusalem glows golden in the night
+        const R=WORLD_R-6, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const city=makeHeavenCity(); city.position.set(gx,0,gz); city.rotation.y=Math.atan2(-gx,-gz); props.add(city); missionCtx.goalObj=city;
+        const angel=makeNPC('angel'); angel.position.set(3,0,3); angel.rotation.y=Math.atan2(gx-3,gz-3); props.add(angel);
+        say('God’s city shines brighter than the sun! Walk to the golden city! 🌟',4200);
       } else { // Jonah — the great fish waits out by the sea
         const fx=(Math.random()*2-1)*(WORLD_R*0.45), fz=WORLD_R*0.6;
         const fish=makeFish(); fish.position.set(fx,0,fz); props.add(fish); missionCtx.goalObj=fish;
@@ -1461,7 +1504,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
     else if(mission.type==='collect'){ sub = (mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':mission.item==='gold'?'💰 ':mission.item==='fruit'?'🍎 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', heavencity:'🌟 Walk to the shining city'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
