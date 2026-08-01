@@ -700,6 +700,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       john:     {robe:0x9a7a4a, trim:0x5e4423, cover:0x6b5a3a, beard:0x4a3218, staff:true, skin:0xd8a068},
       paul:     {robe:0x6b4a8f, trim:0x4a3268, cover:0xc9b280, beard:0x3a2a1a,             skin:0xdba876},
       silas:    {robe:0x3f6b8a, trim:0x2a4a5e, cover:0xc9b280, beard:0x4a3a2a,             skin:0xdba876},
+      philip:   {robe:0x4a8a3f, trim:0x2f5f2a, cover:0xc9b280, beard:0x3a2a1a,             skin:0xdba876},
+      ethiopian:{robe:0xb5892b, trim:0x6a3f8f, cover:0xe8c53a,                             skin:0x7a4a2a},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
 
@@ -886,6 +888,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       const flag=new THREE.Mesh(ugeo('sphere'), nm); flag.position.set(.23,.88,0); flag.scale.set(.17,.09,.09); flag.rotation.z=-.5; g.add(flag);
       g.add(sph(0xfff4c0, .17,.98,.06, .05));                      // glint
       g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    } else if(kind==='plank'){                                     // driftwood from the broken ship (Paul's shipwreck)
+      const b1=box(.95,.10,.30,0xa8794a, 0,.26,0); b1.rotation.y=.35; g.add(b1);   // weathered board washed ashore
+      const b2=box(.72,.09,.24,0x8a5f38, .08,.37,-.06); b2.rotation.y=-.4; g.add(b2); // second board resting across it
+      g.add(sph(0x5e4423, -.30,.33,.10, .05,.05,.05));             // old iron nail head
+      g.add(sph(0xd8ecf8, .26,.46,.04, .05));                      // sea-spray glint
     } else if(kind==='jar'){                                       // a clay jar for the widow's oil
       g.add(part('cylinder',0xb5714a, 0,.16,0, .26,.16,.26));      // flat base
       g.add(sph(0xc57e52, 0,.44,0, .34,.30,.34));                  // round belly
@@ -1363,6 +1370,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'God sent His Holy Spirit like little flames of fire on Jesus’ friends! Gather the bright flames!',
       verse:'“They saw what seemed to be tongues of fire that… came to rest on each of them. All of them were filled with the Holy Spirit.” — Acts 2:3-4',
       env:{ ground:GREEN, water:null, sky:0xf7cfa4, decor:'forest' } },
+    { id:'ethiopian', name:'Philip & the Chariot', emoji:'📜', type:'reach',
+      goal:'A traveler from far-away Ethiopia is reading God’s Word in his chariot — and needs a helper! Run to the chariot like Philip and share the good news about Jesus!',
+      verse:'“Then Philip began with that very passage of Scripture and told him the good news about Jesus.” — Acts 8:35',
+      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
     { id:'damascus', name:'The Road to Damascus', emoji:'💫', type:'reach',
       goal:'A bright light from heaven changed Saul into Paul, God’s helper! Walk to the shining light on the road!',
       verse:'“As he neared Damascus on his journey, suddenly a light from heaven flashed around him.” — Acts 9:3',
@@ -1371,6 +1382,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       goal:'At midnight Paul and Silas sang to God in prison — and the doors flew open! Gather their songs of praise!',
       verse:'“About midnight Paul and Silas were praying and singing hymns to God… At once all the prison doors flew open, and everyone’s chains came loose.” — Acts 16:25-26',
       env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+    { id:'shipwreck', name:'Paul’s Shipwreck', emoji:'⚓', type:'collect', base:9, item:'plank',
+      goal:'The ship broke apart in the storm, but God kept every single person safe! Gather the floating planks so everyone can reach the shore!',
+      verse:'“The rest were to get there on planks or on other pieces of the ship. In this way everyone reached land safely.” — Acts 27:44',
+      env:{ ground:SAND, water:'sea', sky:0x8fa8bd, fogFar:86, decor:'beach' } },
     { id:'fruit', name:'Fruit of the Spirit', emoji:'🍎', type:'collect', base:9, item:'fruit',
       goal:'God’s Spirit grows good things in you — love, joy and peace! Gather the sweet orchard fruit!',
       verse:'“But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.” — Galatians 5:22-23',
@@ -1507,7 +1522,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const pl=makeNPC('paul'); pl.position.set(3,0,-3); pl.rotation.y=2.6; props.add(pl);
         const si=makeNPC('silas'); si.position.set(-3,0,-3); si.rotation.y=-2.6; props.add(si);
       }
-      say(mission.id==='prisonsong'?'Paul and Silas sang at midnight! Gather the golden songs of praise! 🎵✨':mission.id==='oiljars'?'Gather the empty jars — God will fill every one with oil! 🏺✨':mission.id==='fishers'?'Gather the fish along the shore — then go tell everyone about Jesus! 🐟':mission.id==='pentecost'?'Gather the little flames of God’s Spirit! 🔥':mission.id==='creation'?'God said: Let there be light! Gather the first twinkles of light! ✨':mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
+      if(mission.id==='shipwreck'){ // the broken ship aground off the shore — yet everyone made it to land
+        const sx=(Math.random()*2-1)*(WORLD_R*0.35), sz=WORLD_R*0.66;
+        const wr=new THREE.Group(); wr.position.set(sx,0,sz); wr.rotation.set(0,Math.atan2(-sx,-sz)+.6,.20);   // listing on the sandbar
+        wr.add(part('capsule', 0x7a4b22, 0,1.0,0, 4.6,1.3,2.3, 0,0,Math.PI/2));   // weathered hull
+        wr.add(box(7.0,.5,2.1,0x8a5a2b, 0,1.85,0));                               // deck rim
+        wr.add(part('cylinder',0x6b4423, .5,3.0,0, .10,2.6,.10, 0,0,.7));         // broken mast, leaning
+        wr.add(sph(0xe8e2d2, 1.6,3.5,0, .9,.5,.14));                              // torn sail hanging
+        wr.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+        props.add(wr);
+        const pl=makeNPC('paul'); pl.position.set(3,0,-3); pl.rotation.y=2.6; props.add(pl);      // Paul, safe on the beach
+        const ct=makeNPC('joshua'); ct.position.set(-3,0,3); ct.rotation.y=0.8; props.add(ct);    // the kind centurion who kept everyone safe
+      }
+      say(mission.id==='shipwreck'?'God kept everyone safe in the storm! Gather the planks so all can reach the shore! ⚓':mission.id==='prisonsong'?'Paul and Silas sang at midnight! Gather the golden songs of praise! 🎵✨':mission.id==='oiljars'?'Gather the empty jars — God will fill every one with oil! 🏺✨':mission.id==='fishers'?'Gather the fish along the shore — then go tell everyone about Jesus! 🐟':mission.id==='pentecost'?'Gather the little flames of God’s Spirit! 🔥':mission.id==='creation'?'God said: Let there be light! Gather the first twinkles of light! ✨':mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
       const ang=Math.random()*TAU;
       if(mission.id==='star'){
@@ -1639,6 +1666,22 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const lt=new THREE.PointLight(0xfff2c8,1.2,20); lt.position.set(gx,4,gz); props.add(lt);
         const saul=makeNPC('paul'); saul.position.set(gx*0.85,0,gz*0.85); saul.rotation.y=Math.atan2(gx,gz); props.add(saul); // Saul stopped still on the road
         say('A light from heaven changed Saul into Paul, God’s helper! Walk to the shining light! 💫',4200);
+      } else if(mission.id==='ethiopian'){ // the Ethiopian official reads God's Word in his stopped chariot
+        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        const ch=new THREE.Group(); ch.position.set(gx,0,gz); ch.rotation.y=Math.atan2(-gx,-gz)+Math.PI/2;   // stopped side-on across the road
+        ch.add(box(2.6,1.1,1.6,0xa5642f, 0,1.35,0));                              // polished wooden cab
+        ch.add(box(2.9,.25,1.9,0x7a4b22, 0,.85,0));                               // floor beam
+        [-1.5,1.5].forEach(wx=>{ ch.add(part('torus',0x5e4423, wx,.75,0, .68,.68,.55, 0,Math.PI/2,0));       // tall wheels
+          const hub=sph(0xe8c53a, wx,.75,0, .14,.14,.10); hub.castShadow=false; ch.add(hub); });             // gold hubs
+        [[-1.0,-.55],[1.0,-.55],[-1.0,.55],[1.0,.55]].forEach(p=>ch.add(part('cylinder',0xe8c53a, p[0],2.6,p[1], .05,1.5,.05)));
+        ch.add(box(2.5,.18,1.7,0x8a3f8f, 0,3.4,0));                               // royal purple canopy
+        const off=makeNPC('ethiopian'); off.position.set(0,.95,0); off.scale.setScalar(.85); ch.add(off);    // the official riding in the cab
+        const sc=box(.85,.05,.45,0xf3ecd8, 0,2.62,.55); sc.rotation.x=-.5; ch.add(sc);                       // the open scroll of Isaiah
+        props.add(ch); missionCtx.goalObj=ch;
+        for(let s=1;s<6;s++){ const ms=sph(0xcbb692, gx*s/6+Math.sin(s*1.9)*1.5, .26, gz*s/6+Math.cos(s*1.6)*1.5, .32,.22,.28);
+          ms.castShadow=false; props.add(ms); }   // dusty stones mark the desert road to Gaza
+        const ph=makeNPC('philip'); ph.position.set(3,0,3); ph.rotation.y=Math.atan2(gx-3,gz-3); props.add(ph);
+        say('Run like Philip! Walk to the chariot and share the good news! 📜',4200);
       } else { // Jonah — the great fish waits out by the sea
         const fx=(Math.random()*2-1)*(WORLD_R*0.45), fz=WORLD_R*0.6;
         const fish=makeFish(); fish.position.set(fx,0,fz); props.add(fish); missionCtx.goalObj=fish;
@@ -1658,9 +1701,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function updateGoal(){
     let sub='';
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
-    else if(mission.type==='collect'){ sub = (mission.item==='note'?'🎵 ':mission.item==='jar'?'🏺 ':mission.item==='fish'?'🐟 ':mission.item==='flame'?'🔥 ':mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':mission.item==='gold'?'💰 ':mission.item==='fruit'?'🍎 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
+    else if(mission.type==='collect'){ sub = (mission.item==='note'?'🎵 ':mission.item==='plank'?'🪵 ':mission.item==='jar'?'🏺 ':mission.item==='fish'?'🐟 ':mission.item==='flame'?'🔥 ':mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':mission.item==='gold'?'💰 ':mission.item==='fruit'?'🍎 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', builders:'🏠 Walk to the house on the rock', heavencity:'🌟 Walk to the shining city', esther:'👑 Walk to the royal palace', baptism:'🕊️ Walk to Jesus at the river', damascus:'💫 Walk to the shining light'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', builders:'🏠 Walk to the house on the rock', heavencity:'🌟 Walk to the shining city', esther:'👑 Walk to the royal palace', baptism:'🕊️ Walk to Jesus at the river', damascus:'💫 Walk to the shining light', ethiopian:'📜 Walk to the chariot'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
