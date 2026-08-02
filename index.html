@@ -309,6 +309,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       case 'torus':    g = new THREE.TorusGeometry(.5, .16, 8, 20); break;
       case 'boulder':  g = new THREE.IcosahedronGeometry(.5, 1); break; // faceted low-poly rock
       case 'blob':     g = new THREE.IcosahedronGeometry(.5, 0); break; // chunky 20-face blob
+      case 'crag':     g = new THREE.ConeGeometry(.5, 1, 6); break; // faceted rock spire / mountain peak
       case 'arc':      g = new THREE.TorusGeometry(.5, .05, 6, 24, Math.PI); break; // half-ring, e.g. a rainbow band
       default:         g = new THREE.SphereGeometry(.5, 10, 8);
     }
@@ -418,6 +419,38 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           dm.scale.set(bw*0.45, bw*0.30, bw*0.45); dm.position.set(bx, bh-1.5, bz); dm.castShadow=false; groundGroup.add(dm); }
         if(i%4===1){ const tw=new THREE.Mesh(boxGeo, skyMats[1]);           // ...and a slim watchtower
           tw.scale.set(bw*0.28, bh*1.8, bw*0.28); tw.position.set(bx+bw*0.5, bh*0.9-1.6, bz); tw.castShadow=false; groundGroup.add(tw); }
+      }
+    } else if(env.horizon==='mountain'){
+      // deep mountain country: a darker near range of jagged faceted peaks with a storm-cloud
+      // deck snagged on the summits, and a paler far range sunk into the haze behind it —
+      // two silhouette layers so Sinai reads as a real massif, not one lonely hill
+      const hazeC = new THREE.Color(env.sky||0x9db1c4);
+      const nearM = new THREE.MeshLambertMaterial({color:0x6e6252, flatShading:true});
+      const farM  = new THREE.MeshLambertMaterial({color:new THREE.Color(0x7d7263).lerp(hazeC,0.55), flatShading:true});
+      const cloudM= new THREE.MeshLambertMaterial({color:0xd3d7dc});
+      for(let i=0;i<10;i++){
+        const a=i/10*TAU+Math.random()*0.4, rr=WORLD_R*1.85+Math.random()*8;
+        const px=Math.cos(a)*rr, pz=Math.sin(a)*rr, h=17+Math.random()*14, w=10+Math.random()*8;
+        for(let k=0;k<2;k++){                        // paired offset spires break the perfect-cone silhouette
+          const hk=h*(1-k*0.32), wk=w*(1-k*0.35);
+          const p=new THREE.Mesh(ugeo('crag'), nearM);
+          p.scale.set(wk, hk, wk*(0.75+Math.random()*0.4));
+          p.position.set(px+(k?(Math.random()-.5)*w*0.9:0), hk/2-2, pz+(k?(Math.random()-.5)*w*0.9:0));
+          p.rotation.y=Math.random()*TAU; p.rotation.z=(Math.random()-.5)*0.08;
+          p.castShadow=false; groundGroup.add(p);
+        }
+        if(i%3===0){                                 // cloud deck clinging to a summit
+          const cl=new THREE.Mesh(ugeo('sphere'), cloudM);
+          cl.scale.set(w*1.7, h*0.16, w*1.1); cl.position.set(px, h*0.88, pz);
+          cl.castShadow=false; groundGroup.add(cl);
+        }
+      }
+      for(let i=0;i<7;i++){                          // far range ghosting through the haze
+        const a=(i+0.5)/7*TAU+Math.random()*0.4, rr=WORLD_R*2.7+Math.random()*12;
+        const h=24+Math.random()*16, w=16+Math.random()*12;
+        const p=new THREE.Mesh(ugeo('crag'), farM);
+        p.scale.set(w,h,w); p.position.set(Math.cos(a)*rr, h/2-3, Math.sin(a)*rr);
+        p.rotation.y=Math.random()*TAU; p.castShadow=false; groundGroup.add(p);
       }
     } else if(env.interior){
       // indoors — no horizon at all; the biome's own walls enclose the space
@@ -701,6 +734,82 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     for(let i=0;i<6;i++){ const [x,z]=randPos(2); if(Math.abs(x+z)>6) makeRock(x,z,0.5+Math.random()*0.6); }
   }
 
+  // ---- Sinai high-country decor (the 'mountain' biome) ----
+  const STONE_W=[0x9d8a6c,0x8e7b5e,0xa8967a,0x7f6f55];      // warm sun-baked granite tints
+  function makeCrag(x,z,s){
+    // a weathered outcrop: clustered tilted rock spires with a fallen slab at the base
+    const g=new THREE.Group();
+    const n=2+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){
+      const c=new THREE.Mesh(ugeo('crag'), flatMat(STONE_W[Math.floor(Math.random()*4)]));
+      const h=1.4+Math.random()*1.4, w=.9+Math.random()*.8;
+      c.scale.set(w, h, w*(0.7+Math.random()*.5));
+      c.position.set((Math.random()-.5)*1.5, h*0.46, (Math.random()-.5)*1.5);
+      c.rotation.set((Math.random()-.5)*.22, Math.random()*TAU, (Math.random()-.5)*.22);
+      c.castShadow = i===0; c.receiveShadow=true; g.add(c);   // only the tallest spire casts (perf)
+    }
+    const sl=new THREE.Mesh(ugeo('blob'), flatMat(STONE_W[Math.floor(Math.random()*4)]));
+    sl.scale.set(1.1+Math.random()*.6, .5, .9+Math.random()*.5);
+    sl.position.set((Math.random()-.5)*1.8, .2, (Math.random()-.5)*1.8);
+    sl.rotation.y=Math.random()*TAU; sl.castShadow=false; sl.receiveShadow=true; g.add(sl);
+    g.scale.multiplyScalar(s||1); g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function makeScrub(x,z){
+    // dry thorn-scrub clinging to the slope — sparse khaki tufts on wiry stems
+    const g=new THREE.Group(), cols=[0x8a8a52,0x9a935c,0x7b8250];
+    for(let i=0;i<3;i++){
+      const px=(Math.random()-.5)*.9, pz=(Math.random()-.5)*.9;
+      g.add(part('cylinder',0x6b5638, px,.22,pz, .05,.44,.05, (Math.random()-.5)*.5,0,(Math.random()-.5)*.5));
+      g.add(sph(cols[i%3], px,.5,pz, .34+Math.random()*.14,.20,.30+Math.random()*.12));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.03); decor.add(g); return g;
+  }
+  function makeJuniper(x,z){
+    // a hardy wind-bent mountain juniper — gnarled lean, dark tiered crown
+    const g=new THREE.Group();
+    const s=.7+Math.random()*.5, lean=(Math.random()-.5)*.5, JG=[0x3e6b3c,0x466f41,0x37603a];
+    g.add(part('robe',0x74553a, lean*1.2,1.1*s,0, .38*s,2.2*s,.38*s, 0,0,lean));
+    g.add(sph(JG[0], lean*2.6, 2.5*s, 0, 1.25*s,.72*s,1.15*s));
+    g.add(sph(JG[1], lean*2.6+.6*s, 3.1*s, .2*s, .85*s,.5*s,.8*s));
+    g.add(sph(JG[2], lean*2.6-.7*s, 2.15*s, -.3*s, .8*s,.45*s,.75*s));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
+  }
+  function makeIbex(x,z){
+    // "The high mountains belong to the wild goats" (Psalm 104:18) — an ibex posed on a rock
+    const g=new THREE.Group(), C=0xa4885e, CD=0x8d7350, CR=0x5e4b30;
+    const rock=new THREE.Mesh(ugeo('boulder'), flatMat(STONE_W[1]));
+    rock.scale.set(1.9,1.1,1.6); rock.rotation.y=Math.random()*TAU; rock.position.y=.44;
+    rock.castShadow=true; rock.receiveShadow=true; g.add(rock);
+    const b=new THREE.Group(); b.position.y=.95; g.add(b);
+    [[-.28,-.32],[.28,-.32],[-.26,.34],[.26,.34]].forEach(p=>b.add(part('cylinder',CD, p[0],.32,p[1], .09,.62,.09)));
+    b.add(sph(C, 0,.78,0, .40,.34,.62));                          // barrel body
+    b.add(sph(0xcbb894, 0,.62,.18, .30,.18,.44));                 // pale belly
+    b.add(sph(CD, 0,.84,-.58, .10,.09,.13));                      // stub tail
+    b.add(part('capsule',C, 0,1.06,.55, .16,.30,.16, .5,0,0));    // neck
+    b.add(sph(C, 0,1.34,.72, .17,.16,.20));                       // head
+    b.add(sph(0x241c12, -.09,1.38,.84, .025), sph(0x241c12, .09,1.38,.84, .025));
+    b.add(sph(CD, 0,1.30,.90, .05,.04,.05));                      // muzzle
+    b.add(sph(C, -.16,1.44,.60, .04,.10,.02), sph(C, .16,1.44,.60, .04,.10,.02)); // ears
+    [-1,1].forEach(sd=>{                                          // the great back-swept horns
+      const h=part('arc',CR, sd*.09,1.42,.44, .66,.66,.66, -.35, Math.PI/2+sd*.22, 0);
+      b.add(h);
+    });
+    b.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.008); decor.add(g); return g;
+  }
+  function mountainScenery(){
+    for(let i=0,n=Math.round(WORLD_R*0.30);i<n;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) makeCrag(x,z, .8+Math.random()*.6); }
+    for(let i=0,n=Math.round(WORLD_R*0.28);i<n;i++){ const [x,z]=randPos(2); makeRock(x,z, .45+Math.random()*.6); }
+    for(let i=0,n=Math.round(WORLD_R*0.5);i<n;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) makeScrub(x,z); }
+    for(let i=0;i<6;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>8) makeJuniper(x,z); }
+    for(let i=0;i<12;i++){ const [x,z]=randPos(1);                 // loose scree underfoot
+      const pb=sph(STONE_W[i%4], x,.05,z, .3+Math.random()*.3,.07,.26+Math.random()*.24);
+      pb.rotation.y=Math.random()*TAU; pb.castShadow=false; decor.add(pb); }
+    for(let i=0;i<2;i++){ const a=Math.random()*TAU, r=WORLD_R*(0.5+Math.random()*0.3);
+      makeIbex(Math.cos(a)*r, Math.sin(a)*r); }
+  }
+
   // ---- Jerusalem stone-street decor (the 'city' biome) ----
   const PLASTERS=[0xd9cdb4,0xcfc0a4,0xc8b795,0xdccfb0], AWNINGS=[0xb54848,0x4a7fb5,0x7a9a4f,0xb5892b];
   function makeHouse(x,z,ry){
@@ -926,6 +1035,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       templeScenery();
     } else if(d==='river'){
       riverScenery();
+    } else if(d==='mountain'){
+      mountainScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1792,6 +1903,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const COBBLE= [0xcfc2a8,0xc4b596,0xd9ccb2,0xb9aa8b];   // worn limestone street (Jerusalem / Susa)
   const MARBLE= [0xe7dab8,0xdccfa9,0xefe4c6,0xd2c39a];   // polished temple pavement, lamp-warmed
   const SEDGE = [0x6fb054,0x7cb95f,0x64a24a,0x94ad62];   // riverbank sedge-green fading into dry khaki
+  const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -1840,7 +1952,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'bush', name:'The Burning Bush', emoji:'🔥', type:'reach',
       goal:'God spoke to Moses from a bush that burned but never burned up! Walk to the glowing bush!',
       verse:'“Moses saw that though the bush was on fire it did not burn up.” — Exodus 3:2',
-      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
+      env:{ ground:SCREE, water:null, sky:0xf0c795, fogNear:50, fogFar:112, decor:'mountain', horizon:'mountain' } },
     { id:'redsea', name:'Crossing the Red Sea', emoji:'🌊', type:'reach',
       goal:'God parted the sea! Walk the dry path to Moses on the far shore!',
       verse:'“The Israelites went through the sea on dry ground, with a wall of water on their right and on their left.” — Exodus 14:22',
@@ -1852,7 +1964,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'sinai', name:'The Ten Commandments', emoji:'⛰️', type:'reach',
       goal:'God gave Moses His good rules on the mountain! Walk to Mount Sinai!',
       verse:'“He gave him the two tablets of the covenant law, the tablets of stone inscribed by the finger of God.” — Exodus 31:18',
-      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
+      env:{ ground:SCREE, water:null, sky:0x9db1c4, fogNear:44, fogFar:108, decor:'mountain', horizon:'mountain' } },
     { id:'jericho', name:'The Walls of Jericho', emoji:'📯', type:'collect', base:7, item:'horn',
       goal:'March around Jericho! Gather the trumpets so the priests can sound them!',
       verse:'“When the trumpets sounded… the wall collapsed; so everyone charged straight in, and they took the city.” — Joshua 6:20',
