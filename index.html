@@ -232,11 +232,22 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   for(let i=0;i<7;i++) makeCloud((Math.random()-.5)*120, 28+Math.random()*10, (Math.random()-.5)*120, 1+Math.random());
 
   // night star field (shown only for night biomes)
+  // fog:false is load-bearing — the stars sit past the fog's far distance, so with fog
+  // they render as pure sky color (the "no stars at night" bug)
   const starField = new THREE.Group(); scene.add(starField); starField.visible=false;
-  (function(){ const m=new THREE.MeshBasicMaterial({color:0xffffff}), gg=new THREE.SphereGeometry(.5,6,6);
-    for(let i=0;i<70;i++){ const s=new THREE.Mesh(gg,m); const r=95, th=Math.random()*Math.PI*2, ph=0.15+Math.random()*0.6;
-      s.position.set(Math.cos(th)*r*Math.cos(ph), 25+Math.sin(ph)*55, Math.sin(th)*r*Math.cos(ph));
-      s.scale.setScalar(0.35+Math.random()*0.7); starField.add(s); } })();
+  // the play camera pitches steeply down, so the only visible "sky" is a band just above the
+  // horizon — stars and moon live LOW (y≈6–36) where the night camera can actually frame them
+  (function(){ const m=new THREE.MeshBasicMaterial({color:0xffffff, fog:false}),
+      wm=new THREE.MeshBasicMaterial({color:0xfff3cf, fog:false}), gg=new THREE.SphereGeometry(.5,6,6);
+    for(let i=0;i<110;i++){ const s=new THREE.Mesh(gg, i%7?m:wm); const r=78+Math.random()*17, th=Math.random()*Math.PI*2;
+      s.position.set(Math.cos(th)*r, 2+Math.random()*9, Math.sin(th)*r);
+      s.scale.setScalar(0.35+Math.random()*0.85); starField.add(s); }
+    // a big golden moon resting on the up-screen horizon
+    const moon=new THREE.Mesh(new THREE.SphereGeometry(3.4,18,14), new THREE.MeshBasicMaterial({color:0xf6f1de, fog:false}));
+    moon.position.set(-80,5.5,-34); starField.add(moon);   // up-screen left, clear of the mission title card
+    const halo=new THREE.Mesh(new THREE.SphereGeometry(4.7,18,14),
+      new THREE.MeshBasicMaterial({color:0xdfe6ff, fog:false, transparent:true, opacity:0.22}));
+    halo.position.copy(moon.position); starField.add(halo); })();
   let currentEnv = null;
   function setSky(hex, near, far, night){
     const sky = new THREE.Color(hex);
@@ -366,17 +377,37 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     gMesh.receiveShadow = true; gMesh.position.y = 0; groundGroup.add(gMesh);
     ground = gMesh;
 
-    // --- distant rolling hills (FAR outside the play area, never walked on) — storybook horizon ---
-    const hillMat = new THREE.MeshLambertMaterial({color: base[base.length-1].clone().multiplyScalar(0.82).getHex()});
-    const hillGeo = new THREE.SphereGeometry(1, 12, 8);
-    for(let i=0;i<11;i++){
-      const a = i/11*TAU + Math.random()*0.35, rr = WORLD_R*2.6 + Math.random()*14;
-      const hx = Math.cos(a)*rr, hz = Math.sin(a)*rr;
-      const h = new THREE.Mesh(hillGeo, hillMat);
-      const w = 16+Math.random()*20;
-      h.scale.set(w, 5+Math.random()*5, w);
-      h.position.set(hx, -2, hz);          // squashed dome sitting on the misty horizon
-      groundGroup.add(h);
+    // --- distant horizon (FAR outside the play area, never walked on) ---
+    if(env.horizon==='city'){
+      // a layered old-city skyline: flat-roofed sandstone houses, domes and towers fading into haze
+      const skyMats=[new THREE.MeshLambertMaterial({color:0xc9ba9c}), new THREE.MeshLambertMaterial({color:0xbfae8e}),
+                     new THREE.MeshLambertMaterial({color:0xd4c6a8})];
+      const domGeo = new THREE.SphereGeometry(1, 12, 8);
+      for(let i=0;i<15;i++){
+        const a = i/15*TAU + Math.random()*0.32, rr = WORLD_R*2.2 + Math.random()*12;
+        const bx = Math.cos(a)*rr, bz = Math.sin(a)*rr;
+        const bw = 7+Math.random()*8, bh = 5+Math.random()*8;
+        const b = new THREE.Mesh(boxGeo, skyMats[i%3]);
+        b.scale.set(bw, bh, bw*0.8); b.position.set(bx, bh/2-1.6, bz);
+        b.rotation.y = Math.random()*TAU; b.castShadow=false; groundGroup.add(b);
+        if(i%3===0){ const dm=new THREE.Mesh(domGeo, skyMats[2]);           // some roofs carry a dome
+          dm.scale.set(bw*0.45, bw*0.30, bw*0.45); dm.position.set(bx, bh-1.5, bz); dm.castShadow=false; groundGroup.add(dm); }
+        if(i%4===1){ const tw=new THREE.Mesh(boxGeo, skyMats[1]);           // ...and a slim watchtower
+          tw.scale.set(bw*0.28, bh*1.8, bw*0.28); tw.position.set(bx+bw*0.5, bh*0.9-1.6, bz); tw.castShadow=false; groundGroup.add(tw); }
+      }
+    } else {
+      // storybook rolling hills
+      const hillMat = new THREE.MeshLambertMaterial({color: base[base.length-1].clone().multiplyScalar(0.82).getHex()});
+      const hillGeo = new THREE.SphereGeometry(1, 12, 8);
+      for(let i=0;i<11;i++){
+        const a = i/11*TAU + Math.random()*0.35, rr = WORLD_R*2.6 + Math.random()*14;
+        const hx = Math.cos(a)*rr, hz = Math.sin(a)*rr;
+        const h = new THREE.Mesh(hillGeo, hillMat);
+        const w = 16+Math.random()*20;
+        h.scale.set(w, 5+Math.random()*5, w);
+        h.position.set(hx, -2, hz);          // squashed dome sitting on the misty horizon
+        groundGroup.add(h);
+      }
     }
 
     // --- water: smooth, slightly glossy, gently translucent; matches inWater() exactly ---
@@ -484,6 +515,103 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.add(sph(0xffd21a,0,3.05,0,.16));                                      // little bloom on top
     g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
   }
+
+  // ---- Jerusalem stone-street decor (the 'city' biome) ----
+  const PLASTERS=[0xd9cdb4,0xcfc0a4,0xc8b795,0xdccfb0], AWNINGS=[0xb54848,0x4a7fb5,0x7a9a4f,0xb5892b];
+  function makeHouse(x,z,ry){
+    const g=new THREE.Group();
+    const w=4.5+Math.random()*2.5, h=3.2+Math.random()*1.8, dp=3.5+Math.random();
+    const wallC=PLASTERS[Math.floor(Math.random()*PLASTERS.length)];
+    g.add(box(w,h,dp,wallC, 0,h/2,0));                                           // plastered stone walls (only shadow caster)
+    const rim=box(w+.35,.28,dp+.35,0xbfae8f, 0,h+.08,0); rim.castShadow=false; g.add(rim);   // flat-roof parapet lip
+    if(Math.random()<0.45){ const dm=sph(0xcabb9e, 0,h+.30,0, w*.30,h*.17,dp*.30); dm.castShadow=false; g.add(dm); } // some carry a dome
+    g.add(part('cylinder',0x3a3226, 0,.85,dp/2, 1.05,1.7,.30));                  // rounded dark doorway niche
+    const arc=part('arc',0x8a6a42, 0,1.68,dp/2+.10, 1.15,1.15,1.6); arc.castShadow=false; g.add(arc); // stone arch over the door
+    const wx=(Math.random()<.5?-1:1)*w*0.27;                                     // shuttered window + cloth awning
+    const win=box(.8,.8,.14,0x4a3c2c, wx,h*0.62,dp/2); win.castShadow=false; g.add(win);
+    const aw=box(1.5,.09,1.1,AWNINGS[Math.floor(Math.random()*AWNINGS.length)], wx,h*0.62+.66,dp/2+.5);
+    aw.rotation.x=.5; aw.castShadow=false; g.add(aw);
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function makeStall(x,z,ry){
+    const g=new THREE.Group(), can=AWNINGS[Math.floor(Math.random()*AWNINGS.length)];
+    [[-1.15,-.75],[1.15,-.75],[-1.15,.75],[1.15,.75]].forEach(p=>g.add(part('cylinder',0x8a6a42, p[0],1.05,p[1], .09,2.1,.09)));
+    const cv=box(3.1,.1,2.3,can, 0,2.28,0); cv.rotation.x=.14; g.add(cv);        // sloped cloth canopy
+    g.add(box(2.6,.5,1.4,0x9c6b3a, 0,.75,0));                                    // market table
+    [[-.75,0xe8873a],[0,0xb0433a],[.75,0xd9a35a]].forEach(gd=>{                  // oranges, pomegranates, bread
+      g.add(sph(gd[1], gd[0],1.12,0, .30,.20,.26)); g.add(sph(gd[1], gd[0]+.12,1.28,.06, .15)); });
+    g.add(part('cylinder',0x9c6b3a, -1.6,.30,.9, .55,.6,.55));                   // basket beside the stall...
+    g.add(sph(0xd6b25e, -1.6,.62,.9, .24,.12,.24));                              // ...heaped with grain
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function makeJarCluster(x,z){
+    const g=new THREE.Group();
+    for(let i=0,n=2+Math.floor(Math.random()*2);i<n;i++){
+      const jx=(Math.random()-.5)*1.3, jz=(Math.random()-.5)*1.3, s=.8+Math.random()*.45;
+      g.add(sph(0xb5714a, jx,.52*s,jz, .34*s,.5*s,.34*s));                       // clay amphora belly
+      g.add(part('cylinder',0xa5643f, jx,1.02*s,jz, .30*s,.24*s,.30*s));         // neck + rim
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function makePotOlive(x,z){
+    const g=new THREE.Group();
+    g.add(part('robe',0xb0714b, 0,.30,0, .95,.6,.95, Math.PI,0,0));              // terracotta pot (flipped taper = wide rim)
+    g.add(part('cylinder',0x7a5a34, 0,.85,0, .12,.85,.12));
+    g.add(sph(0x8fa06a, 0,1.5,0, .55,.45,.55)); g.add(sph(0x7d9158, .3,1.72,.1, .40,.32,.40));  // silvery olive canopy
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); windify(g,0.03); decor.add(g); return g;
+  }
+  function makeWell(x,z){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0xa89878, 0,.5,0, 1.5,1.0,1.5));                       // round stone wall
+    g.add(part('torus',0x968569, 0,1.02,0, 1.30,1.30,.55, Math.PI/2,0,0));       // worn coping ring
+    const wtr=new THREE.Mesh(ugeo('cylinder'), new THREE.MeshBasicMaterial({color:0x2a5a80}));
+    wtr.scale.set(1.25,.06,1.25); wtr.position.y=.72; g.add(wtr);                // dark water inside
+    [-0.85,0.85].forEach(px=>g.add(part('cylinder',0x8a6a42, px,1.7,0, .10,2.4,.10)));
+    g.add(part('cylinder',0x7a5a34, 0,2.55,0, .09,2.0,.09, 0,0,Math.PI/2));      // windlass beam
+    g.add(part('cylinder',0x9c6b3a, .3,2.0,0, .28,.4,.28));                      // hanging bucket
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function makeBunting(x1,z1,x2,z2){
+    const g=new THREE.Group(); g.position.set(x1,0,z1);
+    const dx=x2-x1, dz=z2-z1, L=Math.hypot(dx,dz);
+    g.add(part('cylinder',0x8a6a42, 0,1.65,0, .09,3.3,.09));                     // two street poles...
+    g.add(part('cylinder',0x8a6a42, dx,1.65,dz, .09,3.3,.09));
+    const pv=pivotAt(0,0,0); pv.rotation.y=Math.atan2(dx,dz); g.add(pv);
+    pv.add(part('cylinder',0x6a5a44, 0,3.06,L/2, .035,L,.035, Math.PI/2,0,0));   // ...a line strung between them...
+    for(let i=0;i<9;i++){ const t=(i+0.5)/9;                                      // ...and little festival flags
+      pv.add(conePart(AWNINGS[i%AWNINGS.length], 0, 2.82, t*L, .16,.44, Math.PI)); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    decor.add(g); return g;
+  }
+  function cityScenery(){
+    // homes ring the square walkable area just PAST the movement clamp (±WORLD_R−1),
+    // so the plaza reads as an enclosed old-city street the player can never clip into
+    const B=WORLD_R+2.6;
+    for(let side=0;side<4;side++){
+      const n=Math.max(4, Math.min(7, Math.round((2*B)/10)));
+      for(let i=0;i<n;i++){
+        const t=-B+(i+0.5)*(2*B)/n + (Math.random()-.5)*1.4, off=B+Math.random()*1.6;
+        if(side===0) makeHouse(t,-off, 0);
+        else if(side===1) makeHouse(t, off, Math.PI);
+        else if(side===2) makeHouse(-off, t, Math.PI/2);
+        else makeHouse(off, t, -Math.PI/2);
+      }
+    }
+    for(let i=0;i<4;i++){ const a=i/4*TAU+0.4+Math.random()*0.5, r=WORLD_R*0.55;   // market stalls mid-plaza
+      makeStall(Math.cos(a)*r, Math.sin(a)*r, -a); }
+    for(let i=0;i<6;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>5) makeJarCluster(x,z); }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>4) makePotOlive(x,z); }
+    for(let i=0;i<10;i++){ const [x,z]=randPos(2);                                 // worn flagstones underfoot
+      const fs=sph([0xc8baa0,0xcfc2a8,0xbcae92][i%3], x,.04,z, .5+Math.random()*.35,.05,.42+Math.random()*.3);
+      fs.rotation.y=Math.random()*TAU; fs.castShadow=false; decor.add(fs); }
+    const wa=Math.random()*TAU, wr=WORLD_R*0.45; makeWell(Math.cos(wa)*wr, Math.sin(wa)*wr);
+    for(let k=0;k<2;k++){ const a=Math.random()*TAU, cx=Math.cos(a)*9, cz=Math.sin(a)*9;   // festive lines overhead
+      makeBunting(cx-Math.sin(a)*6, cz+Math.cos(a)*6, cx+Math.sin(a)*6, cz-Math.cos(a)*6); }
+  }
   // a few drifting butterflies for a living, modern feel (persistent, never cleared)
   const butterflies = [];
   (function spawnButterflies(){
@@ -508,6 +636,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     } else if(d==='beach'){
       for(let i=0;i<Math.round(WORLD_R*0.45);i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6 && !inWater(x,z)) makePalm(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.5+Math.random()); }
+    } else if(d==='city'){
+      cityScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1371,6 +1501,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SAND  = [0xe6d3a0,0xdec994,0xecdcac,0xd8c489];
   const NIGHT_G = [0x2f7a3a,0x357f40,0x2a7136,0x316f3a];
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
+  const COBBLE= [0xcfc2a8,0xc4b596,0xd9ccb2,0xb9aa8b];   // worn limestone street (Jerusalem / Susa)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -1403,7 +1534,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'coin', name:'The Lost Coin', emoji:'🪙', type:'collect', base:10, fixed:10, item:'coin',
       goal:'The woman searched her whole house! Help find all ten silver coins.',
       verse:'“Rejoice with me; I have found my lost coin.” — Luke 15:9',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:COBBLE, water:null, sky:0xf7cfa4, fogFar:92, decor:'city', horizon:'city' } },
     { id:'samuel', name:'Samuel Hears God', emoji:'🕯️', type:'reach',
       goal:'God called little Samuel in the night! Walk to the glowing lamp in God’s house!',
       verse:'“Then Samuel said, ‘Speak, for your servant is listening.’” — 1 Samuel 3:10',
@@ -1463,11 +1594,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'nehemiah', name:'Nehemiah Builds the Wall', emoji:'🧱', type:'collect', base:9, item:'stone',
       goal:'Help Nehemiah gather stones to rebuild the wall of Jerusalem!',
       verse:'“So we rebuilt the wall… for the people worked with all their heart.” — Nehemiah 4:6',
-      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+      env:{ ground:COBBLE, water:null, sky:0xf4dcb0, fogFar:92, decor:'city', horizon:'city' } },
     { id:'esther', name:'Brave Queen Esther', emoji:'👑', type:'reach',
       goal:'Brave Queen Esther went to the king to save her people! Walk to the royal palace!',
       verse:'“And who knows but that you have come to your royal position for such a time as this?” — Esther 4:14',
-      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+      env:{ ground:COBBLE, water:null, sky:0xf2cfae, fogFar:92, decor:'city', horizon:'city' } },
     { id:'isaiah', name:'Here Am I, Send Me!', emoji:'😮', type:'reach',
       goal:'Isaiah saw God’s glory fill the temple! When God asked who would go, Isaiah said: Here am I — send me! Walk to the glowing altar!',
       verse:'“Then I heard the voice of the Lord saying, ‘Whom shall I send? And who will go for us?’ And I said, ‘Here am I. Send me!’” — Isaiah 6:8',
@@ -1535,7 +1666,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'palmsunday', name:'Palm Sunday', emoji:'🌴', type:'collect', base:8, item:'palm',
       goal:'Gather palm branches to welcome Jesus the King!',
       verse:'“Hosanna! Blessed is he who comes in the name of the Lord!” — Matthew 21:9',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:COBBLE, water:null, sky:0x9fd8ff, decor:'city', horizon:'city' } },
     { id:'tomb', name:'The Empty Tomb', emoji:'🌅', type:'reach',
       goal:'Jesus is alive! Walk to the garden tomb and see — the stone is rolled away!',
       verse:'“He is not here; he has risen, just as he said. Come and see the place where he lay.” — Matthew 28:6',
@@ -1741,7 +1872,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       }
       say(mission.id==='potter'?'God shapes us with love, like clay on the potter’s wheel! Gather the soft clay! ⚱️':mission.id==='lydia'?'Gather Lydia’s beautiful purple cloths by the river! 🧵💜':mission.id==='shipwreck'?'God kept everyone safe in the storm! Gather the planks so all can reach the shore! ⚓':mission.id==='prisonsong'?'Paul and Silas sang at midnight! Gather the golden songs of praise! 🎵✨':mission.id==='oiljars'?'Gather the empty jars — God will fill every one with oil! 🏺✨':mission.id==='fishers'?'Gather the fish along the shore — then go tell everyone about Jesus! 🐟':mission.id==='pentecost'?'Gather the little flames of God’s Spirit! 🔥':mission.id==='creation'?'God said: Let there be light! Gather the first twinkles of light! ✨':mission.id==='gideon'?'Gather trumpets for Gideon’s brave 300! 🎺':mission.id==='sower'?'Gather the good harvest that grew on good soil! 🌱':mission.id==='fruit'?'Gather the sweet fruit God’s Spirit grows! 🍎':mission.id==='elijah'?'The ravens brought bread from God! 🐦🍞':mission.id==='joseph'?'Store up the golden grain like wise Joseph! 🌾':mission.id==='coin'?'Search everywhere for the shiny silver coins! 🪙':mission.id==='abram'?'Count the stars like Abraham! Gather the starlight! ✨':mission.id==='nehemiah'?'Gather stones to rebuild the wall! 🧱':mission.id==='solomon'?'Gather the shining gold for God’s temple! 🏛️✨':(mission.item==='stone'?'Grab the smooth stones! 🪨':(mission.item==='bread'?'Grab the loaves and fish! 🍞🐟':(mission.item==='palm'?'Wave the palm branches! 🌴 Hosanna!':(mission.item==='grain'?'Glean the golden grain, like kind Ruth! 🌾':(mission.item==='pearl'?'Look inside the shells for shining pearls! 🦪✨':(mission.item==='horn'?'Gather the ram-horn trumpets for the big march! 📯':'Grab the manna bread! 🍞')))))),4000);
     } else if(mission.type==='reach'){
-      const ang=Math.random()*TAU;
+      // goal angle is constrained to the far (−x,−z) half of the world: the start camera sits at
+      // (+16,20,+16), so this cone is up-screen and in frame — never hidden behind the joystick/HUD
+      const ang=Math.PI*0.75 + 0.25 + Math.random()*(Math.PI - 0.5);
       if(mission.id==='star'){
         const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
         const stable=makeStable(); stable.position.set(gx,0,gz); props.add(stable);
@@ -2158,7 +2291,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
   // ================= UPDATE LOOP =================
   const camTarget = new THREE.Vector3();
-  function camSnap(){ const p=player.position; camera.position.set(p.x+16,20,p.z+16); camera.lookAt(p.x,1.5,p.z); }
+  // at night the camera rides a little lower and looks a little higher, so the frame top
+  // clears the horizon and the starfield + moon are actually visible in play
+  function camSnap(){ const p=player.position, n=currentEnv&&currentEnv.night;
+    camera.position.set(p.x+16, n?16:20, p.z+16); camera.lookAt(p.x, n?2.5:1.5, p.z); }
   const clock = new THREE.Clock();
 
   function frame(dt){
@@ -2203,9 +2339,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         camera.position.set(player.position.x+dbgCam.x, dbgCam.y, player.position.z+dbgCam.z);
         camera.lookAt(player.position.x+(dbgCam.tx||0), dbgCam.ly==null?1.5:dbgCam.ly, player.position.z+(dbgCam.tz||0));
       } else {
-        camTarget.set(player.position.x+16, 20, player.position.z+16);
+        const nCam=currentEnv&&currentEnv.night;
+        camTarget.set(player.position.x+16, nCam?16:20, player.position.z+16);
         camera.position.lerp(camTarget, 0.12);
-        camera.lookAt(player.position.x, 1.5, player.position.z);
+        camera.lookAt(player.position.x, nCam?2.5:1.5, player.position.z);
       }
 
       checkMission();
