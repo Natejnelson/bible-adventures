@@ -121,6 +121,12 @@
     #stick { width: 118px; height: 118px; left: 18px; bottom: 20px; }
     #knob { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
   }
+
+#heroWrap{width:min(440px,86vw);height:236px;margin:10px auto 4px;border-radius:22px;
+  overflow:hidden;position:relative;
+  background:linear-gradient(180deg,#bfe6ff 0%,#d8f0d2 62%,#cfe8b8 100%);
+  box-shadow:0 10px 26px rgba(20,50,70,.20), inset 0 0 0 3px rgba(255,255,255,.55);}
+#heroCanvas{width:100%;height:100%;display:block;}
 </style>
 </head>
 <body>
@@ -141,6 +147,7 @@
 <div class="screen show" id="startScreen">
   <div class="bigTitle">✝️ Bible Adventures</div>
   <div class="subTitle">Explore God's world and live the great Bible stories!</div>
+  <div id="heroWrap"><canvas id="heroCanvas"></canvas></div>
   <div id="ageLabel">Who's playing?</div>
   <div id="ages"></div>
   <input id="nameInput" maxlength="12" placeholder="Type your name…" autocomplete="off" autocapitalize="words" spellcheck="false" />
@@ -509,42 +516,105 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   }
 
   // ================= CHARACTERS (rounded & lifelike, matching the smooth low-poly world) =================
+  // living-character registry: every player/NPC/animal registers a "rig" here and
+  // animateRigs() (called every frame) gives it breath, blinks, glances and reactions.
+  const rigs = [];
+  let playerRig = null;
+  function regRig(r){
+    r.ph = Math.random()*TAU;            // personal phase so crowds never move in sync
+    r.blinkT = 1 + Math.random()*3; r.blink = 0;
+    if(r.eyes) r.eyeB = r.eyes.map(e=>e.scale.y);   // base y-scale — blink multiplies, never overwrites
+    r.lookY = 0; r.lookX = 0; r.moodT = 0;
+    r.o.userData._rig = r;               // back-reference so gameplay events can trigger reactions
+    rigs.push(r); return r;
+  }
+  function pruneRigs(){                  // drop rigs whose object left the scene (mission cleanup)
+    for(let i=rigs.length-1;i>=0;i--){
+      if(rigs[i].keep) continue;          // home-screen cast lives in its own scene
+      let o=rigs[i].o, ok=false;
+      while(o){ if(o===scene){ ok=true; break; } o=o.parent; }
+      if(!ok) rigs.splice(i,1);
+    }
+  }
+  function celebrate(r,secs,hop){        // big smile + raised brows (+ a happy hop) for a moment
+    if(!r) return; r.moodT = Math.max(r.moodT, secs||1.2);
+    if(hop) r.hopT = 0.55;
+  }
+
   function makePlayer(){
     const g = new THREE.Group();
-    const skin=0xf2c79a, tunic=0xdcbf82, belt=0x8a5a2b, hair=0x5a3921, sandal=0x7a4a26;
-    const hipY=1.25, shoulderY=2.15, headY=2.78;
+    const skin=0xf2c79a, tunic=0xdcbf82, tunicD=0xc4a262, sashC=0xa03c30, belt=0x8a5a2b,
+          hair=0x4a2f18, sandal=0x7a4a26, iris=0x3a2a1a;
+    const hipY=1.30, shoulderY=2.18, headY=2.80;
 
-    // legs: pivots at the hip so the walk-cycle code can rotate them about X
-    const legL = pivotAt(-.30, hipY, 0), legR = pivotAt(.30, hipY, 0);
+    // legs: pivots at the hip so the walk-cycle code can rotate them about X (feet land at y≈0)
+    const legL = pivotAt(-.27, hipY, 0), legR = pivotAt(.27, hipY, 0);
     [legL,legR].forEach(p=>{
-      p.add(capsuleHang(skin, 0, 0, 0, 1.10, .12));       // bare shin
-      p.add(sph(sandal, 0, -1.10, .04, .15, .08, .17));    // sandal
+      p.add(capsuleHang(tunicD, 0, 0, 0, .55, .145));       // tunic-shadowed thigh
+      p.add(capsuleHang(skin, -0, -.50, 0, .72, .12));      // bare shin
+      p.add(sph(skin,   0, -1.20, .06, .10,.08,.13));       // foot
+      p.add(sph(sandal, 0, -1.26, .09, .13,.05,.21));       // sandal sole (long — reads in profile)
     });
     g.add(legL, legR);
 
-    // tunic / robe torso + rope belt
-    g.add(part('robe', tunic, 0, (hipY+shoulderY)/2, 0, 1.05, shoulderY-hipY, 1.05));
-    g.add(part('torus', belt, 0, hipY+.12, 0, .68,.68,.42, Math.PI/2,0,0));
+    // everything above the hips lives in a "body" wrapper so it can breathe,
+    // lean into a run and squash/stretch without moving the feet
+    const body = new THREE.Group(); body.position.y = hipY; g.add(body);
+    const B = y => y - hipY;
 
-    // arms: pivots at the shoulder
-    const armL = pivotAt(-.62, shoulderY, 0), armR = pivotAt(.62, shoulderY, 0);
+    // knee-length tunic with hem, fold creases, a red shoulder sash and a rope belt
+    body.add(part('robe', tunic, 0, B((hipY+shoulderY)/2)-.28, 0, 1.10, (shoulderY-hipY)+.56, 1.10));
+    body.add(part('torus', tunicD, 0, B(hipY)-.52, 0, .95,.95,.30, Math.PI/2,0,0));     // hem roll
+    body.add(part('capsule', tunicD, -.19, B(hipY)-.28, .47, .10,.34,.07, -.15,0,0));   // fold crease
+    body.add(part('capsule', tunicD,  .15, B(hipY)-.30, .47, .09,.30,.07, -.15,0,0));   // fold crease
+    body.add(sph(tunic, 0, B(2.16), 0, .36,.16,.32));                                   // rounded chest/shoulder dome
+    body.add(sph(skin, 0, B(2.28), 0, .14,.14,.14));                                    // neck
+    body.add(part('torus', sashC, 0, B(2.16), 0, .60,.60,.28, Math.PI/2,0,0));          // red neckline trim
+    body.add(part('torus', belt, 0, B(hipY+.14), 0, .74,.74,.36, Math.PI/2,0,0));       // rope belt
+    body.add(sph(belt, .16, B(hipY+.02), .44, .07,.06,.05));                            // belt knot
+    body.add(part('capsule', belt, .20, B(hipY-.16), .46, .07,.24,.05, .1,0,.25));      // belt tail
+
+    // arms: pivots socketed into the shoulder dome (short sleeve, bare forearm, mitt hand)
+    const armL = pivotAt(-.44, B(2.06), 0), armR = pivotAt(.44, B(2.06), 0);
     [armL,armR].forEach(p=>{
-      p.add(capsuleHang(tunic, 0, 0, 0, .82, .17));        // sleeve
-      p.add(sph(skin, 0, -.82, 0, .17));                   // hand
+      p.add(sph(tunic, 0, .03, 0, .16,.14,.15));            // shoulder cap (overlaps the dome — no gap)
+      p.add(capsuleHang(tunic, 0, .06, 0, .48, .14));       // short sleeve
+      p.add(capsuleHang(skin, 0, -.40, 0, .44, .105));      // bare forearm
+      p.add(sph(skin, 0, -.86, 0, .12,.145,.11));           // hand
     });
-    g.add(armL, armR);
+    body.add(armL, armR);
 
-    // head — warm, kind little face
-    const head = new THREE.Group(); head.position.set(0, headY, 0); g.add(head);
-    head.add(sph(skin, 0,0,0, .40,.39,.40));
-    head.add(sph(skin, -.40,-.02,0, .07,.09,.07), sph(skin, .40,-.02,0, .07,.09,.07)); // ears
-    head.add(sph(0x2a2a2a, -.16,.05,.34, .045,.05,.035), sph(0x2a2a2a, .16,.05,.34, .045,.05,.035)); // eyes
-    head.add(sph(0xf3a9a0, -.29,-.06,.27, .07,.05,.03), sph(0xf3a9a0, .29,-.06,.27, .07,.05,.03));   // rosy cheeks
-    head.add(sph(0xb5695a, 0,-.16,.37, .07,.03,.025));     // gentle smile
-    head.add(sph(hair, 0,.13,-.02, .43,.28,.43));          // hair cap
-    head.add(sph(hair, 0,.03,.30, .30,.16,.20));           // little fringe
+    // head — a warm, kind face that reads from the play camera
+    const head = new THREE.Group(); head.position.set(0, B(headY), 0); body.add(head);
+    head.add(sph(skin, 0,0,0, .40,.42,.40));
+    head.add(sph(skin, -.40,-.03,0, .07,.10,.06), sph(skin, .40,-.03,0, .07,.10,.06)); // ears
+    head.add(sph(skin, 0,-.04,.40, .06,.05,.045));                                     // button nose
+    const eyeL = new THREE.Group(), eyeR = new THREE.Group();
+    eyeL.position.set(-.155,.07,.355); eyeR.position.set(.155,.07,.355);
+    [eyeL,eyeR].forEach(e=>{
+      e.add(sph(0xffffff, 0,0,0, .088,.10,.045));           // eye white
+      e.add(sph(iris, 0,0,.04, .052,.062,.028));            // iris
+      e.add(sph(0x14100c, 0,.005,.062, .026,.03,.016));     // pupil
+      e.add(sph(0xffffff, .025,.035,.072, .016));           // catchlight
+      head.add(e);
+    });
+    const browD = 0x2e1c0e;                                 // brows a shade darker than the hair
+    const browL = sph(browD, -.16,.19,.365, .085,.026,.035), browR = sph(browD, .16,.19,.365, .085,.026,.035);
+    head.add(browL, browR);
+    head.add(sph(0xf3a9a0, -.27,-.06,.28, .075,.05,.03), sph(0xf3a9a0, .27,-.06,.28, .075,.05,.03)); // rosy cheeks
+    const mouth = new THREE.Group(); mouth.position.set(0,-.145,.385); head.add(mouth);
+    mouth.add(sph(0x8f4438, 0,0,0, .072,.028,.022));                                    // smile
+    mouth.add(sph(0x8f4438, -.066,.02,-.005, .022,.02,.016),
+              sph(0x8f4438,  .066,.02,-.005, .022,.02,.016));                           // upturned corners
+    head.add(sph(hair, 0,.17,-.04, .44,.30,.40));           // hair cap
+    head.add(sph(hair, 0,.285,.21, .35,.10,.15));           // fringe — hairline above the brows
+    head.add(sph(hair, -.36,.06,.08, .12,.22,.15), sph(hair,.36,.06,.08, .12,.22,.15)); // side locks
+    head.add(sph(hair, 0,-.02,-.33, .28,.30,.16));          // back of hair
 
-    g.userData = { legL, legR, armL, armR };
+    g.userData = { legL, legR, armL, armR, body, head, mouth };
+    playerRig = regRig({ o:g, kind:'player', body, head, mouth,
+      eyes:[eyeL,eyeR], brows:[browL,browR], arms:[armL,armR], legs:[legL,legR],
+      phase:0, mb:0, speed:0, accel:0, max:5.6, sq:1, hopT:0 });
     return g;
   }
   // shared quadruped leg+body rig, reused by most animals below
@@ -556,84 +626,111 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.add(sph(bodyColor,0,bodyY,0,br[0],br[1],br[2]));
     g.userData.legs = legs;
   }
+  // head pivot helper: everything face-related goes in one group hinged at the neck,
+  // so grazing / looking / startling all read as one natural motion
+  function headPivot(g,x,y,z){ const h=new THREE.Group(); h.position.set(x,y,z); g.add(h); return h; }
+  function tailPivot(g,x,y,z){ const t=new THREE.Group(); t.position.set(x,y,z); g.add(t); return t; }
   function makeAnimal(type){
     const g = new THREE.Group();
     const eye = 0x2a2320;
+    // per-species personality: graze = how far the head dips, chew = nibble speed,
+    // tailAmp/tailSpd = tail swish, earFlick = how twitchy the ears are
+    let head=null, tail=null, ears=[], eyes=[], extra=null;
+    let P = { graze:.55, chew:6, tailAmp:.35, tailSpd:2.2, earFlick:1 };
     switch(type){
       case 'sheep': {
         const wool=0xfbfaf6, face=0xf3d9b8, legC=0x6b6b6b, bodyY=.52;
         quad(g,wool,legC,bodyY,[.50,.44,.68],.10,.28,.38);
         [[-.28,.78,.30],[.28,.78,.30],[-.32,.62,-.30],[.32,.62,-.30],[0,.85,0]].forEach(([x,y,z])=>g.add(sph(wool,x,y,z,.24,.22,.24))); // fluffy wool
-        g.add(sph(face,0,.66,.72,.24,.21,.22));                     // face
-        g.add(sph(face,-.24,.60,.66,.09,.13,.07), sph(face,.24,.60,.66,.09,.13,.07)); // droopy ears
-        g.add(sph(eye,-.09,.70,.90,.035), sph(eye,.09,.70,.90,.035));
-        g.add(sph(0x8a6a5a,0,.60,.92,.05,.04,.045));                // nose
-        g.add(sph(wool,0,.60,-.68,.14));                            // tail
+        head = headPivot(g,0,.64,.46);
+        head.add(sph(wool,0,.06,.14,.20,.18,.20));                  // woolly top-knot
+        head.add(sph(face,0,.02,.26,.24,.21,.22));                  // face
+        ears=[sph(face,-.24,-.04,.20,.09,.13,.07), sph(face,.24,-.04,.20,.09,.13,.07)]; ears.forEach(e=>head.add(e)); // droopy ears
+        eyes=[sph(eye,-.09,.07,.44,.04,.05,.03), sph(eye,.09,.07,.44,.04,.05,.03)]; eyes.forEach(e=>head.add(e));
+        head.add(sph(0x8a6a5a,0,-.04,.46,.05,.04,.045));            // nose
+        tail = tailPivot(g,0,.62,-.60); tail.add(sph(wool,0,-.02,-.10,.14));
+        P = { graze:.55, chew:7, tailAmp:.55, tailSpd:6, earFlick:1.2 };
         break;
       }
       case 'lion': {
         const body=0xdca844, mane=0x8a4a1e, legC=0xc4913a, bodyY=.62;
         quad(g,body,legC,bodyY,[.46,.40,.66],.13,.30,.42);
-        g.add(sph(mane,0,.86,.60,.44,.42,.40));
-        [[-.30,1.02,.72],[.30,1.02,.72],[0,1.16,.62],[-.30,.66,.66],[.30,.66,.66]].forEach(([x,y,z])=>g.add(sph(mane,x,y,z,.16)));
-        g.add(sph(body,0,.90,.86,.30,.28,.30));                     // head
-        g.add(sph(body,-.20,1.14,.86,.10), sph(body,.20,1.14,.86,.10)); // round ears
-        g.add(sph(eye,-.12,.94,1.08,.04), sph(eye,.12,.94,1.08,.04));
-        g.add(sph(0xecc88a,0,.80,1.10,.13,.11,.15));                // muzzle
-        g.add(sph(0x3a2618,0,.78,1.22,.05,.04,.04));                // nose
-        g.add(part('capsule',legC,0,.66,-.64,.10,.34,.10, Math.PI/2,0,0)); // tail
-        g.add(sph(mane,0,.55,-.92,.09));                            // tail tuft
+        head = headPivot(g,0,.80,.44);
+        head.add(sph(mane,0,.06,.16,.44,.42,.40));
+        [[-.30,.22,.28],[.30,.22,.28],[0,.36,.18],[-.30,-.14,.22],[.30,-.14,.22]].forEach(([x,y,z])=>head.add(sph(mane,x,y,z,.16)));
+        head.add(sph(body,0,.10,.42,.30,.28,.30));                  // head
+        ears=[sph(body,-.20,.34,.42,.10), sph(body,.20,.34,.42,.10)]; ears.forEach(e=>head.add(e)); // round ears
+        eyes=[sph(eye,-.12,.14,.64,.04), sph(eye,.12,.14,.64,.04)]; eyes.forEach(e=>head.add(e));
+        head.add(sph(0xecc88a,0,0,.66,.13,.11,.15));                // muzzle
+        head.add(sph(0x3a2618,0,-.02,.78,.05,.04,.04));             // nose
+        tail = tailPivot(g,0,.68,-.56);
+        tail.add(part('capsule',legC,0,-.02,-.10,.10,.34,.10, Math.PI/2,0,0));
+        tail.add(sph(mane,0,-.13,-.36,.09));                        // tail tuft
+        P = { graze:.3, chew:4, tailAmp:.6, tailSpd:3.2, earFlick:1.4 };
         break;
       }
       case 'cow': {
         const body=0xf5f1e6, spot=0x3a3632, legC=0xe6e0d2, bodyY=.68;
         quad(g,body,legC,bodyY,[.50,.46,.74],.14,.32,.44);
         g.add(sph(spot,-.24,.88,.32,.20,.17,.14), sph(spot,.20,.58,-.30,.16,.14,.12));
-        g.add(sph(0xf0ece0,0,.86,.78,.28,.26,.28));                 // head
-        g.add(sph(0xf7d9c9,0,.76,1.02,.14,.11,.10));                // muzzle patch
-        g.add(sph(0x5a5450,-.06,.76,1.10,.035), sph(0x5a5450,.06,.76,1.10,.035)); // nostrils
-        g.add(conePart(0xece7da,-.22,1.10,.72,.05,.16), conePart(0xece7da,.22,1.10,.72,.05,.16)); // horns
-        g.add(sph(0xe6e0d2,-.30,.82,.70,.12,.16,.06), sph(0xe6e0d2,.30,.82,.70,.12,.16,.06)); // ears
-        g.add(sph(eye,-.14,.92,1.00,.04), sph(eye,.14,.92,1.00,.04));
-        g.add(part('capsule',legC,0,.70,-.72,.10,.32,.10, Math.PI/2,0,0));
-        g.add(sph(0x3a3632,0,.58,-1.00,.08));
+        head = headPivot(g,0,.82,.56);
+        head.add(sph(0xf0ece0,0,.04,.26,.28,.26,.28));              // head
+        head.add(sph(0xf7d9c9,0,-.06,.50,.14,.11,.10));             // muzzle patch
+        head.add(sph(0x5a5450,-.06,-.06,.58,.035), sph(0x5a5450,.06,-.06,.58,.035)); // nostrils
+        head.add(conePart(0xece7da,-.22,.28,.20,.05,.16), conePart(0xece7da,.22,.28,.20,.05,.16)); // horns
+        ears=[sph(0xe6e0d2,-.30,0,.18,.12,.16,.06), sph(0xe6e0d2,.30,0,.18,.12,.16,.06)]; ears.forEach(e=>head.add(e));
+        eyes=[sph(eye,-.14,.10,.48,.04), sph(eye,.14,.10,.48,.04)]; eyes.forEach(e=>head.add(e));
+        tail = tailPivot(g,0,.72,-.64);
+        tail.add(part('capsule',legC,0,-.02,-.08,.10,.32,.10, Math.PI/2,0,0));
+        tail.add(sph(0x3a3632,0,-.14,-.36,.08));
+        P = { graze:.55, chew:3.4, tailAmp:.5, tailSpd:2.6, earFlick:1.6 };
         break;
       }
       case 'elephant': {
         const body=0xa9b2ba, legC=0x8f9aa2, bodyY=.98;
         quad(g,body,legC,bodyY,[.68,.58,.92],.21,.46,.62);
-        g.add(sph(body,0,1.14,.88,.40,.38,.38));                    // head
-        g.add(sph(body,-.55,1.14,.66,.34,.42,.06), sph(body,.55,1.14,.66,.34,.42,.06)); // big ears
-        g.add(sph(eye,-.16,1.18,1.16,.045), sph(eye,.16,1.18,1.16,.045));
-        g.add(capsuleHang(body,0,.98,1.20,.62,.15));                // trunk upper
-        g.add(part('capsule',body,-.06,.42,1.36,.24,.30,.24, Math.PI*0.42,0,0)); // trunk curl
-        g.add(sph(0xf3efe6,-.16,.92,1.28,.05,.10,.05), sph(0xf3efe6,.16,.92,1.28,.05,.10,.05)); // tusks
-        g.add(part('capsule',legC,0,.90,-.78,.06,.36,.06, Math.PI/2,0,0)); // tail
+        head = headPivot(g,0,1.08,.56);
+        head.add(sph(body,0,.06,.32,.40,.38,.38));                  // head
+        ears=[sph(body,-.55,.06,.10,.34,.42,.06), sph(body,.55,.06,.10,.34,.42,.06)]; ears.forEach(e=>head.add(e)); // big ears
+        eyes=[sph(eye,-.16,.10,.60,.045), sph(eye,.16,.10,.60,.045)]; eyes.forEach(e=>head.add(e));
+        const trunk = new THREE.Group(); trunk.position.set(0,-.06,.62); head.add(trunk); extra={trunk};
+        trunk.add(capsuleHang(body,0,-.04,.02,.62,.15));            // trunk upper
+        trunk.add(part('capsule',body,-.06,-.62,.18,.24,.30,.24, Math.PI*0.42,0,0)); // trunk curl
+        head.add(sph(0xf3efe6,-.16,-.14,.70,.05,.10,.05), sph(0xf3efe6,.16,-.14,.70,.05,.10,.05)); // tusks
+        tail = tailPivot(g,0,.92,-.72);
+        tail.add(part('capsule',legC,0,-.02,-.08,.06,.36,.06, Math.PI/2,0,0));
+        P = { graze:.25, chew:2.6, tailAmp:.4, tailSpd:1.8, earFlick:.8, earFan:true };
         break;
       }
       case 'pig': {
         const body=0xf7abc0, legC=0xe58ba3, bodyY=.40;
         quad(g,body,legC,bodyY,[.42,.36,.56],.11,.26,.34);
-        g.add(sph(body,0,.54,.56,.26,.23,.24));                     // head
-        g.add(conePart(0xe58ba3,-.16,.68,.52,.06,.16,-0.5), conePart(0xe58ba3,.16,.68,.52,.06,.16,0.5)); // perky ears
-        g.add(part('cylinder',0xe07d98,0,.50,.78,.22,.10,.22, Math.PI/2,0,0)); // snout
-        g.add(sph(0x9a4a5e,-.05,.50,.86,.025), sph(0x9a4a5e,.05,.50,.86,.025)); // nostrils
-        g.add(sph(eye,-.11,.62,.74,.032), sph(eye,.11,.62,.74,.032));
-        g.add(part('torus',body,0,.42,-.56,.07,.07,.07, 0,Math.PI/2,0)); // curly tail
+        head = headPivot(g,0,.50,.36);
+        head.add(sph(body,0,.04,.20,.26,.23,.24));                  // head
+        head.add(conePart(0xe58ba3,-.16,.18,.16,.06,.16,-0.5), conePart(0xe58ba3,.16,.18,.16,.06,.16,0.5)); // perky ears
+        const snout = part('cylinder',0xe07d98,0,0,.42,.22,.10,.22, Math.PI/2,0,0); head.add(snout); extra={snout};
+        head.add(sph(0x9a4a5e,-.05,0,.50,.025), sph(0x9a4a5e,.05,0,.50,.025)); // nostrils
+        eyes=[sph(eye,-.11,.12,.38,.032), sph(eye,.11,.12,.38,.032)]; eyes.forEach(e=>head.add(e));
+        tail = tailPivot(g,0,.42,-.50);
+        tail.add(part('torus',body,0,0,-.06,.07,.07,.07, 0,Math.PI/2,0)); // curly tail
+        P = { graze:.6, chew:9, tailAmp:.9, tailSpd:7, earFlick:1.5 };
         break;
       }
       case 'giraffe': {
         const body=0xecc25a, spot=0x8a5a2b, legC=0xd9a933, bodyY=1.45;
         quad(g,body,legC,bodyY,[.38,.34,.60],.13,.26,.38);
-        [[-.22,1.10,.30],[.20,1.65,-.10],[-.14,2.05,.25],[.18,1.35,-.28],[0,1.85,-.05],[-.10,2.30,.10]].forEach(([x,y,z])=>g.add(sph(spot,x,y,z,.13,.12,.09)));
-        g.add(part('capsule',body,0,1.55,.10,.40,1.05,.40, -0.12,0,0)); // long neck
-        g.add(sph(body,0,2.62,.28,.24,.22,.26));                    // head
-        g.add(conePart(0x8a5a2b,-.10,2.90,.28,.035,.16), conePart(0x8a5a2b,.10,2.90,.28,.035,.16)); // ossicones
-        g.add(sph(0x6b3f1c,-.10,2.99,.28,.045), sph(0x6b3f1c,.10,2.99,.28,.045));
-        g.add(sph(body,-.20,2.68,.24,.08,.11,.05), sph(body,.20,2.68,.24,.08,.11,.05)); // ears
-        g.add(sph(eye,-.13,2.66,.48,.04), sph(eye,.13,2.66,.48,.04));
-        g.add(sph(0xd9a933,0,2.52,.52,.09,.07,.08));                // muzzle
-        g.add(sph(spot,0,.55,-.66,.10));
+        [[-.22,1.10,.30],[.18,1.35,-.28]].forEach(([x,y,z])=>g.add(sph(spot,x,y,z,.13,.12,.09)));
+        head = headPivot(g,0,1.50,.06);                             // pivot at the neck base — whole neck dips to graze
+        head.add(part('capsule',body,0,.05,.10,.40,1.05,.40, -0.12,0,0)); // long neck
+        [[.06,.45,-.14],[-.10,.85,.14],[0,.62,-.10],[-.06,1.05,.16]].forEach(([x,y,z])=>head.add(sph(spot,x,y,z,.11,.10,.08)));
+        head.add(sph(body,0,1.12,.22,.24,.22,.26));                 // head
+        head.add(conePart(0x8a5a2b,-.10,1.40,.22,.035,.16), conePart(0x8a5a2b,.10,1.40,.22,.035,.16)); // ossicones
+        head.add(sph(0x6b3f1c,-.10,1.49,.22,.045), sph(0x6b3f1c,.10,1.49,.22,.045));
+        ears=[sph(body,-.20,1.18,.18,.08,.11,.05), sph(body,.20,1.18,.18,.08,.11,.05)]; ears.forEach(e=>head.add(e));
+        eyes=[sph(eye,-.13,1.16,.42,.04), sph(eye,.13,1.16,.42,.04)]; eyes.forEach(e=>head.add(e));
+        head.add(sph(0xd9a933,0,1.02,.46,.09,.07,.08));             // muzzle
+        tail = tailPivot(g,0,1.42,-.58); tail.add(sph(spot,0,-.85,-.06,.10));
+        P = { graze:.7, chew:2.8, tailAmp:.45, tailSpd:2.4, earFlick:1 };
         break;
       }
       case 'chicken': {
@@ -643,11 +740,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         g.userData.legs = legs;
         g.add(sph(body,0,bodyY,0,.30,.32,.36));
         g.add(sph(body,-.22,bodyY+.02,-.05,.19,.14,.24), sph(body,.22,bodyY+.02,-.05,.19,.14,.24)); // wings
-        g.add(sph(body,0,bodyY+.44,.24,.19,.18,.19));               // head
-        g.add(conePart(beak,0,bodyY+.42,.44,.05,.14,Math.PI/2));    // beak
-        g.add(sph(comb,-.05,bodyY+.60,.22,.05,.08,.04), sph(comb,.05,bodyY+.60,.22,.05,.08,.04)); // comb
-        g.add(sph(eye,-.10,bodyY+.46,.36,.03), sph(eye,.10,bodyY+.46,.36,.03));
-        g.add(sph(body,0,bodyY-.02,-.32,.14,.16,.16));              // tail puff
+        head = headPivot(g,0,bodyY+.24,.12);
+        head.add(sph(body,0,.20,.12,.19,.18,.19));                  // head
+        head.add(conePart(beak,0,.18,.32,.05,.14,Math.PI/2));       // beak
+        head.add(sph(comb,-.05,.36,.10,.05,.08,.04), sph(comb,.05,.36,.10,.05,.08,.04)); // comb
+        eyes=[sph(eye,-.10,.22,.24,.03), sph(eye,.10,.22,.24,.03)]; eyes.forEach(e=>head.add(e));
+        tail = tailPivot(g,0,bodyY+.02,-.24); tail.add(sph(body,0,-.04,-.08,.14,.16,.16)); // tail puff
+        P = { graze:1.0, chew:14, tailAmp:.5, tailSpd:8, earFlick:0, peck:true };
         break;
       }
       case 'zebra': {
@@ -655,20 +754,26 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         quad(g,body,legC,bodyY,[.42,.38,.66],.12,.30,.40);
         [[-.20,.78],[0,.82],[.20,.72],[-.16,.56],[.14,.52]].forEach(([x,y])=>g.add(sph(stripe,x,y,.30,.10,.09,.05)));
         [[-.30,.66],[.30,.66],[0,.60]].forEach(([x,y])=>g.add(sph(stripe,x,y,-.30,.09,.09,.05)));
-        g.add(sph(body,0,.86,.72,.24,.22,.28));                     // head
-        [[0,1.00],[.06,.94],[-.06,.94],[.12,.86],[-.12,.86]].forEach(([x,y])=>g.add(sph(stripe,x,y,.62,.03,.07,.03))); // mane
-        g.add(sph(body,-.16,1.04,.66,.10,.14,.06), sph(body,.16,1.04,.66,.10,.14,.06)); // ears
-        g.add(sph(eye,-.12,.90,.96,.04), sph(eye,.12,.90,.96,.04));
-        g.add(sph(0x3a3632,-.05,.78,1.02,.03), sph(0x3a3632,.05,.78,1.02,.03));
-        g.add(part('capsule',legC,0,.68,-.66,.09,.32,.09, Math.PI/2,0,0));
-        g.add(sph(stripe,0,.54,-.94,.08));
+        head = headPivot(g,0,.80,.48);
+        head.add(sph(body,0,.06,.24,.24,.22,.28));                  // head
+        [[0,.20],[.06,.14],[-.06,.14],[.12,.06],[-.12,.06]].forEach(([x,y])=>head.add(sph(stripe,x,y,.14,.03,.07,.03))); // mane
+        ears=[sph(body,-.16,.24,.18,.10,.14,.06), sph(body,.16,.24,.18,.10,.14,.06)]; ears.forEach(e=>head.add(e));
+        eyes=[sph(eye,-.12,.10,.48,.04), sph(eye,.12,.10,.48,.04)]; eyes.forEach(e=>head.add(e));
+        head.add(sph(0x3a3632,-.05,-.02,.54,.03), sph(0x3a3632,.05,-.02,.54,.03));
+        tail = tailPivot(g,0,.70,-.58);
+        tail.add(part('capsule',legC,0,-.02,-.08,.09,.32,.09, Math.PI/2,0,0));
+        tail.add(sph(stripe,0,-.14,-.36,.08));
+        P = { graze:.55, chew:4.5, tailAmp:.55, tailSpd:3.4, earFlick:2 };
         break;
       }
       default: {
         quad(g,0xeeeeee,0x999999,.6,[.45,.4,.65],.13,.30,.40);
-        g.add(sph(0xeeeeee,0,.86,.7,.24));
+        head = headPivot(g,0,.80,.45); head.add(sph(0xeeeeee,0,.06,.25,.24));
       }
     }
+    Object.assign(g.userData, {head, tail});
+    regRig({ o:g, kind:'animal', type, head, tail, ears, eyes, extra,
+      legs:g.userData.legs, P, st:'idle', stT:.5+Math.random()*2, hx:0, aph:Math.random()*TAU });
     return g;
   }
   function makeNPC(kind){
@@ -689,13 +794,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       angel:    {robe:0xf7f4ea, trim:0xe8d9a0, cover:0xf7f4ea, halo:true,      skin:0xe8c49a},
       abraham:  {robe:0x7a6a9a, trim:0x4f4370, cover:0xd8c9a3, beard:0xe8e8e0, staff:true, skin:0xdba876},
       nehemiah: {robe:0x8a3f4f, trim:0x5e2a36, cover:0xc9b280,                 skin:0xdba876},
-      solomon:  {robe:0x6a3f8f, trim:0xe8c53a, cover:0xe8c53a, beard:0x3a2a1a, skin:0xdba876},
+      solomon:  {robe:0x6a3f8f, trim:0xe8c53a, cover:0xe8c53a, beard:0x3a2a1a, crown:true, skin:0xdba876},
       eli:      {robe:0x6b6053, trim:0x4a4038, cover:0xd8c9a3, beard:0xd8d4c8, staff:true, skin:0xdba876},
       traveler: {robe:0x8a8378, trim:0x5e594e, cover:0xb8b0a0,                 skin:0xdba876},
       samaritan:{robe:0x3f8a6b, trim:0x2a5f49, cover:0xd8c9a3, beard:0x4a3a2a, staff:true, skin:0xdba876},
       elisha:   {robe:0x5f7a6b, trim:0x3f5548, cover:0x8a7a5e, beard:0x4a3a2a, staff:true, skin:0xdba876},
       widow:    {robe:0x8a7050, trim:0x5e4c36, cover:0xb8a888, veil:true,      skin:0xdba876},
-      esther:   {robe:0x8a3f8f, trim:0xe8c53a, cover:0xe8d9a0, veil:true,      skin:0xe3b48a},
+      esther:   {robe:0x8a3f8f, trim:0xe8c53a, cover:0xe8d9a0, veil:true, crown:true, skin:0xe3b48a},
       mordecai: {robe:0x4f6b8a, trim:0x35485e, cover:0xc9b280, beard:0x5a4a3a, staff:true, skin:0xdba876},
       john:     {robe:0x9a7a4a, trim:0x5e4423, cover:0x6b5a3a, beard:0x4a3218, staff:true, skin:0xd8a068},
       paul:     {robe:0x6b4a8f, trim:0x4a3268, cover:0xc9b280, beard:0x3a2a1a,             skin:0xdba876},
@@ -703,39 +808,68 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       philip:   {robe:0x4a8a3f, trim:0x2f5f2a, cover:0xc9b280, beard:0x3a2a1a,             skin:0xdba876},
       ethiopian:{robe:0xb5892b, trim:0x6a3f8f, cover:0xe8c53a,                             skin:0x7a4a2a},
       miriam:   {robe:0x6f9a4f, trim:0xe8d9a0, cover:0xd8e2c4, veil:true,      skin:0xdba876},
-      princess: {robe:0x2a9d9f, trim:0xe8c53a, cover:0xe8c53a, veil:true,      skin:0xe3b48a},
+      princess: {robe:0x2a9d9f, trim:0xe8c53a, cover:0xe8c53a, veil:true, crown:true, skin:0xe3b48a},
       lydia:    {robe:0x7a3f9a, trim:0xe8d9a0, cover:0xc9a8e0, veil:true,      skin:0xe3b48a},
       isaiah:   {robe:0x8f6b3f, trim:0x5e4423, cover:0xd8c9a3, beard:0x6b5a44, staff:true, skin:0xdba876},
       jeremiah: {robe:0x6b7a4a, trim:0x49542f, cover:0xc9b280, beard:0x5a4a3a, staff:true, skin:0xdba876},
       potter:   {robe:0xa5643f, trim:0x6b4028, cover:0x8a7a5e, beard:0x4a3a2a,             skin:0xdba876},
     }[kind] || {robe:0xaaaaaa, trim:0x888888, cover:0xdddddd, skin:0xe3b48a};
     const skin=CFG.skin, hipY=.05, shoulderY=2.10, headY=2.55;
+    const browC = CFG.beard || 0x3a2a1a;
 
-    g.add(part('robe', CFG.robe, 0, (hipY+shoulderY)/2, 0, 1.55, shoulderY-hipY, 1.55)); // flowing robe
-    g.add(part('torus', CFG.trim, 0, 1.35, 0, .82,.82,.55, Math.PI/2,0,0));              // sash
+    // body wrapper so the whole figure can breathe and sway (staff stays planted)
+    const body = new THREE.Group(); g.add(body);
 
-    const armL = pivotAt(-.86, shoulderY-.05, 0), armR = pivotAt(.86, shoulderY-.05, 0);
-    [armL,armR].forEach(p=>{ p.add(capsuleHang(CFG.robe,0,0,0,.90,.19)); p.add(sph(skin,0,-.90,0,.16)); });
-    g.add(armL, armR);
+    body.add(part('robe', CFG.robe, 0, (hipY+shoulderY)/2, 0, 1.55, shoulderY-hipY, 1.55)); // flowing robe
+    body.add(part('torus', CFG.trim, 0, .16, 0, 1.30,1.30,.30, Math.PI/2,0,0));             // hem band
+    body.add(part('capsule', CFG.trim, -.16, .60, .71, .10,.55,.06, -.14,0,0));             // front fold stripe
+    body.add(part('capsule', CFG.trim,  .16, .60, .71, .10,.55,.06, -.14,0,0));             // front fold stripe
+    body.add(part('torus', CFG.trim, 0, 1.35, 0, .82,.82,.55, Math.PI/2,0,0));              // sash
+    body.add(sph(CFG.robe, 0, 2.06, 0, .54,.20,.46));                                       // rounded shoulder dome
+    body.add(sph(CFG.robe,-.46,2.00,0,.22,.17,.20), sph(CFG.robe,.46,2.00,0,.22,.17,.20));  // shoulders
 
-    const head = new THREE.Group(); head.position.set(0,headY,0); g.add(head);
-    head.add(sph(skin,0,0,0,.40,.39,.40));
-    head.add(sph(eye,-.15,.06,.34,.04,.045,.03), sph(eye,.15,.06,.34,.04,.045,.03));
-    head.add(sph(0xb5695a,0,-.10,.38,.08,.03,.025));               // gentle smile
+    const armL = pivotAt(-.62, shoulderY-.08, 0), armR = pivotAt(.62, shoulderY-.08, 0);
+    [armL,armR].forEach(p=>{ p.add(sph(CFG.robe,0,.02,0,.18,.16,.17)); p.add(capsuleHang(CFG.robe,0,.04,0,.90,.18)); p.add(sph(skin,0,-.86,0,.13,.15,.12)); });
+    armL.rotation.x = armR.rotation.x = -.16;                       // arms gently forward
+    armL.rotation.z = .12; armR.rotation.z = -.12;
+    body.add(armL, armR);
+
+    const head = new THREE.Group(); head.position.set(0,headY,0); body.add(head);
+    head.add(sph(skin,0,0,0,.40,.41,.40));
+    head.add(sph(skin,0,-.03,.40,.06,.055,.05));                   // nose
+    const eyeL = new THREE.Group(), eyeR = new THREE.Group();
+    eyeL.position.set(-.15,.07,.355); eyeR.position.set(.15,.07,.355);
+    [eyeL,eyeR].forEach(e=>{
+      e.add(sph(0xffffff,0,0,0,.078,.088,.04));
+      e.add(sph(0x3a2a1a,0,0,.036,.046,.055,.026));
+      e.add(sph(0x14100c,0,.004,.056,.023,.027,.015));
+      head.add(e);
+    });
+    head.add(sph(browC,-.15,.195,.35,.082,.024,.033), sph(browC,.15,.195,.35,.082,.024,.033)); // brows
+    const mouthZ = CFG.beard? .41 : .38;
+    head.add(sph(0xb5695a,0,-.13,mouthZ,.075,.03,.025));           // gentle smile
+    head.add(sph(0xb5695a,-.065,-.108,mouthZ-.015,.024,.02,.016), sph(0xb5695a,.065,-.108,mouthZ-.015,.024,.02,.016)); // smile corners
     if (CFG.beard){
-      head.add(sph(CFG.beard,0,-.24,.20,.28,.24,.24));
-      head.add(sph(CFG.beard,0,-.40,.16,.18,.16,.16));
+      head.add(sph(CFG.beard,0,-.26,.18,.29,.25,.24));             // full beard (below the mouth line)
+      head.add(sph(CFG.beard,0,-.44,.14,.19,.20,.15));             // beard taper
+      head.add(sph(CFG.beard,-.17,-.12,.30,.10,.14,.08), sph(CFG.beard,.17,-.12,.30,.10,.14,.08)); // beard cheeks
+      head.add(sph(CFG.beard,0,-.06,.40,.075,.026,.028));          // moustache above the smile
     } else {
-      head.add(sph(0xf3a9a0,-.28,-.06,.28,.06,.05,.03), sph(0xf3a9a0,.28,-.06,.28,.06,.05,.03)); // cheeks
+      head.add(sph(0xf3a9a0,-.27,-.06,.28,.065,.05,.03), sph(0xf3a9a0,.27,-.06,.28,.065,.05,.03)); // cheeks
     }
     if (CFG.veil){
-      head.add(sph(CFG.cover,0,.14,-.04,.50,.36,.50));
+      head.add(sph(CFG.cover,0,.16,-.10,.48,.34,.42));             // veil wraps the crown, face stays clear
       head.add(sph(CFG.cover,0,-.28,-.30,.46,.50,.30));            // veil draping down the back
     } else {
-      head.add(sph(CFG.cover,0,.16,-.06,.46,.28,.46));             // head covering
-      head.add(part('torus',CFG.trim,0,.10,.28,.30,.30,.26, Math.PI/2,0,0)); // cord
+      head.add(sph(CFG.cover,0,.16,-.07,.46,.28,.43));             // head covering (behind the brow line)
+      head.add(part('torus',CFG.trim,0,.10,.24,.30,.30,.26, Math.PI/2,0,0)); // cord
     }
-    g.add(sph(skin,0,1.90,.46,.15,.12,.12));                       // clasped hands at chest
+    if (CFG.crown){
+      const cy = CFG.veil? .54 : .40;                              // sits atop the veil when there is one
+      head.add(part('cylinder',0xe8c53a,0,cy,0,.56,.16,.56));
+      [[0,.24],[-.17,.17],[.17,.17]].forEach(([x,z])=>head.add(conePart(0xe8c53a,x,cy+.12,z,.05,.14)));
+      head.add(sph(0xd0463f,0,cy+.02,.29,.05,.05,.03));            // ruby
+    }
 
     if (CFG.staff){
       g.add(part('cylinder', 0x7a5230, 1.10, 1.95, .20, .09,3.4,.09, 0,0,-.08));
@@ -743,9 +877,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
     if (CFG.halo){
       const halo = new THREE.Mesh(ugeo('torus'), new THREE.MeshBasicMaterial({color:0xffe14d}));
-      halo.position.set(0, headY+.62, -.05); halo.rotation.x = Math.PI/2 - .35; halo.scale.set(.85,.85,.85);
-      g.add(halo);
+      halo.position.set(0, .62, -.05); halo.rotation.x = Math.PI/2 - .35; halo.scale.set(.85,.85,.85);
+      head.add(halo);
     }
+    regRig({ o:g, kind:'npc', body, head, eyes:[eyeL,eyeR], arms:[armL,armR] });
     return g;
   }
   function makeArk(){
@@ -1214,6 +1349,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
   // ================= GAME STATE =================
   let player=null, mission=null, missionCtx=null, playing=false, walkPhase=0, age='Age6', playerName='';
+  let curSpeed=0; const moveDir={x:0,z:1};   // locomotion momentum (accelerate / glide to a stop)
   function who(){ return (playerName && playerName.trim()) || 'friend'; }
   const goalEl=document.getElementById('goal'), goalSub=document.getElementById('goalSub'), sayEl=document.getElementById('say');
   let sayTimer=null;
@@ -1839,6 +1975,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
 
     // HUD + camera + start
+    pruneRigs();          // drop character rigs whose meshes were cleared with the last mission
     document.body.className='playing';
     hideScreens();
     updateGoal();
@@ -1855,6 +1992,168 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', builders:'🏠 Walk to the house on the rock', heavencity:'🌟 Walk to the shining city', esther:'👑 Walk to the royal palace', baptism:'🕊️ Walk to Jesus at the river', damascus:'💫 Walk to the shining light', ethiopian:'📜 Walk to the chariot', basket:'🧺 Walk to baby Moses in the reeds', elijahangel:'😇 Walk to the angel by the broom tree', isaiah:'😮 Walk to the glowing altar', furnace:'🔥 Walk to the fiery furnace'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
+  }
+
+  // ================= LIVING-CHARACTER ANIMATION =================
+  // Runs every frame for every registered rig: breath, blinks, glances, walk cycles,
+  // grazing, tail swishes, startles and celebrations. Transform-only — no new meshes,
+  // no new materials, no lights — so it costs almost nothing on iPad.
+  function animateRigs(dt,T){
+    for(let i=0;i<rigs.length;i++){
+      const r=rigs[i];
+      // blinking (players, NPCs and animals all blink)
+      if(r.eyes){
+        r.blinkT-=dt;
+        if(r.blinkT<=0){ r.blink=.13; r.blinkT=1.6+Math.random()*3.4; }
+        if(r.blink>0){ r.blink-=dt; const s=r.blink>.055?.12:1;
+          for(let k=0;k<r.eyes.length;k++) r.eyes[k].scale.y=r.eyeB[k]*s; }
+      }
+      if(r.moodT>0) r.moodT-=dt;
+      if(r.kind==='player') animPlayer(r,dt,T);
+      else if(r.kind==='npc') animNPC(r,dt,T);
+      else if(r.kind==='animal') animAnimal(r,dt,T);
+    }
+  }
+  function animPlayer(r,dt,T){
+    const u=r.o.userData;
+    if(!playing) r.speed=0;
+    const spd=r.speed, sp01=Math.min(1,spd/(r.max||5.6));
+    const moving = sp01>0.02;
+    r.mb += ((moving?1:0)-r.mb)*Math.min(1,dt*8);                 // walk<->idle blend
+    const happy = r.moodT>0, effort = !happy && sp01>0.72;
+
+    // --- walk/run cycle, phase tied to ground speed so the feet don't skate ---
+    const ampLeg = .30+.52*sp01;
+    const stride = 2*Math.sin(Math.max(.2,ampLeg))*1.28;          // arc a 1.28-long leg sweeps per step
+    r.phase += Math.PI*spd*dt/Math.max(.6,stride);
+    const sw=Math.sin(r.phase)*ampLeg*r.mb;
+    u.legL.rotation.x=sw; u.legR.rotation.x=-sw;
+    const asw=Math.sin(r.phase)*(.22+.46*sp01)*r.mb;
+    u.armL.rotation.x=-asw + (1-r.mb)*Math.sin(T*2.1+1)*.04;      // counter-swing + idle drift
+    u.armR.rotation.x= asw + (1-r.mb)*Math.sin(T*2.1)*.04;
+    u.armL.rotation.z= .12+(1-r.mb)*.04*Math.sin(T*1.7)      + (happy? 2.0:0);  // arms fly UP on a cheer
+    u.armR.rotation.z=-.12-(1-r.mb)*.04*Math.sin(T*1.7+2.1)  - (happy? 2.0:0);
+
+    // --- torso: breathe, lean into the run, squash/stretch on speed changes ---
+    const tgtSq = 1 + clamp(r.accel*.010, -.10, .07);
+    r.sq += (tgtSq-r.sq)*Math.min(1,dt*10);
+    const breathe = 1+Math.sin(T*2.4+r.ph)*.016*(1-r.mb*.6);
+    r.body.scale.y = r.sq*breathe;
+    r.body.scale.x = r.body.scale.z = 1+(1-r.sq)*.55;
+    const lean = r.mb*(.06+.16*sp01);
+    r.body.rotation.x = lean + Math.sin(r.phase*2)*.02*r.mb;      // tiny per-step pulse
+    r.body.rotation.z = (1-r.mb)*Math.sin(T*.55+r.ph)*.033;      // idle weight shift
+    r.body.position.x = (1-r.mb)*Math.sin(T*.55+r.ph)*.022;
+
+    // --- bob + happy hop (this owns player.position.y) ---
+    let y = Math.abs(Math.sin(r.phase))*(.03+.10*sp01)*r.mb;
+    if(r.hopT>0){ r.hopT-=dt; y += Math.sin(Math.min(1,1-r.hopT/.55)*Math.PI)*.5; }
+    r.o.position.y = y;
+
+    // --- head: glance at the nearest animal/goal; drift when nothing's near ---
+    r.lookT=(r.lookT||0)-dt;
+    if(r.lookT<=0){ r.lookT=.3;
+      let best=null,bd=15;
+      if(playing){
+        for(const c of critters.children){ if(c.userData.caught) continue;
+          const d=Math.hypot(c.position.x-r.o.position.x,c.position.z-r.o.position.z);
+          if(d<bd){bd=d;best=c;} }
+        if(!best && missionCtx && missionCtx.goalObj){
+          const go=missionCtx.goalObj, d=Math.hypot(go.position.x-r.o.position.x,go.position.z-r.o.position.z);
+          if(d<24) best=go; }
+      }
+      r.lookTarget=best;
+    }
+    let ty=Math.sin(T*.32+r.ph)*.22, tx=0;
+    if(r.lookTarget && r.lookTarget.parent){
+      const lt=r.lookTarget;
+      let a=Math.atan2(lt.position.x-r.o.position.x, lt.position.z-r.o.position.z)-r.o.rotation.y;
+      while(a>Math.PI)a-=TAU; while(a<-Math.PI)a+=TAU;
+      if(Math.abs(a)<1.15){ ty=clamp(a,-.8,.8); tx=.10; }
+    }
+    r.lookY += (ty-r.lookY)*Math.min(1,dt*4);
+    r.lookX += (tx-r.lookX)*Math.min(1,dt*4);
+    r.head.rotation.y = r.lookY;
+    r.head.rotation.x = -lean*.6 + r.lookX + Math.sin(T*2.4+r.ph)*.012 + (happy?-.14:0);
+
+    // --- expression: big smile + raised brows when happy, knit brows + open mouth on a hard run ---
+    const k=Math.min(1,dt*10);
+    const mSX = happy?1.3: effort?1.08 :1,  mSY = happy?1.8: effort?1.6 :1;
+    r.mouth.scale.x += (mSX-r.mouth.scale.x)*k;
+    r.mouth.scale.y += (mSY-r.mouth.scale.y)*k;
+    const bY = happy?.23: effort?.175 :.19;
+    const bR = effort?.26:0;
+    for(let b=0;b<2;b++){ const br=r.brows[b];
+      br.position.y += (bY-br.position.y)*k;
+      br.rotation.z += (((b?1:-1)*bR)-br.rotation.z)*k; }
+  }
+  function animNPC(r,dt,T){
+    // gentle idle life: breath, sway, arm rock — and they turn to greet the player
+    r.body.scale.y = 1+Math.sin(T*1.9+r.ph)*.012;
+    r.body.rotation.z = Math.sin(T*.62+r.ph)*.02;
+    r.arms[0].rotation.z =  .12+Math.sin(T*1.25+r.ph)*.035;
+    r.arms[1].rotation.z = -.12-Math.sin(T*1.25+r.ph+1.9)*.035;
+    let ty=Math.sin(T*.3+r.ph)*.26, tx=0;
+    if(player){
+      const dx=player.position.x-r.o.position.x, dz=player.position.z-r.o.position.z, d=Math.hypot(dx,dz);
+      if(d<12){
+        let a=Math.atan2(dx,dz)-r.o.rotation.y;
+        while(a>Math.PI)a-=TAU; while(a<-Math.PI)a+=TAU;
+        if(Math.abs(a)<2.0){ ty=clamp(a,-.8,.8); tx=.07; }
+      }
+    }
+    r.lookY += (ty-r.lookY)*Math.min(1,dt*2.5);
+    r.head.rotation.y = r.lookY;
+    r.head.rotation.x = tx + Math.sin(T*1.9+r.ph)*.018;           // tiny nod with the breath
+  }
+  function animAnimal(r,dt,T){
+    const u=r.o.userData, P=r.P;
+    const spd = u.wspd||0;
+    // legs trot when roaming/following (diagonal pairs), settle when standing
+    if(r.legs && r.legs.length){
+      if(spd>.05){
+        r.aph += dt*(5+spd*2.6);
+        const s=Math.sin(r.aph)*.45;
+        for(let l=0;l<r.legs.length;l++) r.legs[l].rotation.x = ((l===0||l===3)?s:-s);
+      } else {
+        for(const l of r.legs) l.rotation.x *= (1-Math.min(1,dt*8));
+      }
+    }
+    // startle: heads snap up when the player charges close
+    let d=99;
+    if(player) d=Math.hypot(player.position.x-r.o.position.x, player.position.z-r.o.position.z);
+    if(d<3.4 && playerRig && playerRig.speed>3 && r.st!=='alert'){ r.st='alert'; r.stT=.9+Math.random()*.6; }
+    r.stT-=dt;
+    if(r.stT<=0){
+      if(r.st==='graze'){ r.st='idle'; r.stT=1.2+Math.random()*2.4; }
+      else { r.st = Math.random()<.6?'graze':'idle'; r.stT = r.st==='graze'? 1.6+Math.random()*2.6 : 1+Math.random()*2; }
+    }
+    // head: dip to graze (with nibbles), lift alert, idle glances
+    const tgt = r.st==='graze'? P.graze : r.st==='alert'? -.28 : 0;
+    r.hx += (tgt-r.hx)*Math.min(1,dt*(r.st==='alert'?9:3));
+    if(r.head){
+      const nib = r.st==='graze'? Math.abs(Math.sin(T*P.chew+r.ph))*(P.peck?.35:.08) : 0;
+      r.head.rotation.x = r.hx + nib + Math.sin(T*1.5+r.ph)*.02;
+      r.head.rotation.y = Math.sin(T*.42+r.ph)*(r.st==='idle'?.22:.05);
+    }
+    // tail: constant gentle swish, excited when caught/celebrating or alert
+    if(r.tail){
+      const ex = (r.moodT>0||r.st==='alert')?2.6:1;
+      r.tail.rotation.y = Math.sin(T*P.tailSpd*ex+r.ph)*P.tailAmp;
+      if(u.type==='pig') r.tail.rotation.x = Math.sin(T*9+r.ph)*.3;   // curly-tail wiggle
+    }
+    // ear flicks: random quick twitches (plus slow elephant-ear fanning)
+    if(r.ears && r.ears.length && P.earFlick){
+      r.earT = (r.earT===undefined? Math.random()*3 : r.earT-dt*P.earFlick);
+      if(r.earT<=0){ r.earT=2+Math.random()*4; r.earI=Math.random()<.5?0:1; r.earK=1; }
+      if(r.earK>0){ r.earK-=dt*6;
+        r.ears[r.earI].rotation.z=(r.earI?1:-1)*(Math.max(0,r.earK)*.55); }
+      if(P.earFan){ r.ears[0].rotation.y= .18+Math.sin(T*1.1+r.ph)*.16; r.ears[1].rotation.y=-.18-Math.sin(T*1.1+r.ph+.7)*.16; }
+    }
+    if(r.extra){
+      if(r.extra.trunk) r.extra.trunk.rotation.x = Math.sin(T*1.3+r.ph)*.14 + (r.st==='graze'?.3:0); // trunk sway
+      if(r.extra.snout){ const s=1+Math.abs(Math.sin(T*7+r.ph))*.10; r.extra.snout.scale.x=.22*s; r.extra.snout.scale.z=.22*s; } // snuffling snout
+    }
   }
 
   // ================= UPDATE LOOP =================
@@ -1876,32 +2175,38 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       // Gentle, kid-friendly control: a generous dead-zone so a light touch
       // doesn't move, and a calm top speed with ease-in so it's never twitchy.
       const DEAD=0.24, MAXSPEED=(AGE_SPEED[age]||5.6);   // two-speed feel: ease-in for slow, full push for fast — and scaled by age
+      // momentum: ease up to speed, glide to a stop — never instant on/off
+      let targetSp=0;
       if(mag>DEAD){
         const nrm = Math.min(1,(mag-DEAD)/(1-DEAD));          // 0..1 past the dead-zone
         const nx=ix/mag, ny=iy/mag;                          // pure direction
         const fwd=-ny, rgt=nx;
-        mvx = (-F*fwd) + (F*rgt);
-        mvz = (-F*fwd) + (-F*rgt);
-        const speed = MAXSPEED * nrm;
-        player.position.x = clamp(player.position.x + mvx*speed*dt, -WORLD_R+1, WORLD_R-1);
-        player.position.z = clamp(player.position.z + mvz*speed*dt, -WORLD_R+1, WORLD_R-1);
+        moveDir.x = (-F*fwd) + (F*rgt);
+        moveDir.z = (-F*fwd) + (-F*rgt);
+        targetSp = MAXSPEED * nrm;
+      }
+      const prevSp=curSpeed;
+      curSpeed += (targetSp-curSpeed)*Math.min(1, dt*(targetSp>curSpeed?7.5:9.5));
+      if(targetSp===0 && curSpeed<0.05) curSpeed=0;
+      if(curSpeed>0){
+        player.position.x = clamp(player.position.x + moveDir.x*curSpeed*dt, -WORLD_R+1, WORLD_R-1);
+        player.position.z = clamp(player.position.z + moveDir.z*curSpeed*dt, -WORLD_R+1, WORLD_R-1);
         // smooth turning (no instant snapping)
-        const targetRot = Math.atan2(mvx, mvz);
+        const targetRot = Math.atan2(moveDir.x, moveDir.z);
         let dr = targetRot - player.rotation.y; while(dr>Math.PI)dr-=TAU; while(dr<-Math.PI)dr+=TAU;
         player.rotation.y += dr * Math.min(1, dt*9);
-        // walk bob
-        walkPhase += dt*11*nrm;
-        const sw=Math.sin(walkPhase)*0.5;
-        player.userData.legL.rotation.x=sw; player.userData.legR.rotation.x=-sw;
-        player.userData.armL.rotation.x=-sw; player.userData.armR.rotation.x=sw;
-        player.position.y = Math.abs(Math.sin(walkPhase))*0.12;
-      } else {
-        player.position.y *= 0.8;
       }
+      // hand the numbers to the character rig — it does the walk cycle, lean and squash
+      if(playerRig){ playerRig.speed=curSpeed; playerRig.max=MAXSPEED; playerRig.accel=dt>0?(curSpeed-prevSp)/dt:0; }
       // camera follow (fixed angle)
-      camTarget.set(player.position.x+16, 20, player.position.z+16);
-      camera.position.lerp(camTarget, 0.12);
-      camera.lookAt(player.position.x, 1.5, player.position.z);
+      if(dbgCam){ // debug-only close-up camera (set via ?debug hooks; never in normal play)
+        camera.position.set(player.position.x+dbgCam.x, dbgCam.y, player.position.z+dbgCam.z);
+        camera.lookAt(player.position.x+(dbgCam.tx||0), dbgCam.ly==null?1.5:dbgCam.ly, player.position.z+(dbgCam.tz||0));
+      } else {
+        camTarget.set(player.position.x+16, 20, player.position.z+16);
+        camera.position.lerp(camTarget, 0.12);
+        camera.lookAt(player.position.x, 1.5, player.position.z);
+      }
 
       checkMission();
       updateTimer();
@@ -1909,7 +2214,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       const t=performance.now()*0.001;
       const wsp=missionCtx?missionCtx.wander:0, fleeR=missionCtx?missionCtx.fleeR:0;
       critters.children.forEach(c=>{ const u=c.userData; if(u.caught) return;
-        c.position.y = Math.abs(Math.sin(t*2+c.position.x))*0.06;
+        let sp2=0;
         if(wsp>0 && u.vx!==undefined){
           u.turnT-=dt; if(u.turnT<=0){ u.turnT=0.8+Math.random()*1.6; const a=Math.random()*TAU; u.vx=Math.cos(a); u.vz=Math.sin(a); }
           let dx=u.vx, dz=u.vz, sp=wsp;
@@ -1917,15 +2222,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
             if(d<fleeR && d>0.1){ dx=ddx/d; dz=ddz/d; sp=wsp*1.9; } }   // bolt away from the player
           let nx=c.position.x+dx*sp*dt, nz=c.position.z+dz*sp*dt;
           if(Math.abs(nx)>WORLD_R-2||Math.abs(nz)>WORLD_R-2||inWater(nx,nz)){ u.vx=-u.vx; u.vz=-u.vz; }   // bounce off edges/water
-          else { c.position.x=nx; c.position.z=nz; c.rotation.y=Math.atan2(dx,dz); }
+          else { c.position.x=nx; c.position.z=nz; c.rotation.y=Math.atan2(dx,dz); sp2=sp; }
         }
+        u.wspd=sp2;                                       // the rig animates legs/head off this
+        c.position.y = sp2>0.05 ? Math.abs(Math.sin(t*9+c.position.x))*0.06 : 0;   // little steps while roaming
       });
       items.children.forEach(it=>{ it.rotation.y+=dt*1.6; it.position.y=Math.sin(t*2+it.userData.spin)*0.12; });
       if(missionCtx&&missionCtx.starObj){ missionCtx.starObj.rotation.y+=dt*0.7; }
       // followers trail behind player (Noah)
       if(missionCtx){ let prev=player.position, i=0;
         missionCtx.followers.forEach(f=>{ i++; const tx=prev.x - Math.sin(player.rotation.y)*2.0, tz=prev.z - Math.cos(player.rotation.y)*2.0;
+          const ofx=f.position.x, ofz=f.position.z;
           f.position.x += (tx-f.position.x)*0.12; f.position.z += (tz-f.position.z)*0.12;
+          f.userData.wspd = Math.hypot(f.position.x-ofx, f.position.z-ofz)/Math.max(dt,0.001);   // legs trot while trailing
           f.rotation.y = Math.atan2(player.position.x-f.position.x, player.position.z-f.position.z)||f.rotation.y;
           if(f.userData.hop>0){ f.position.y=Math.sin((0.9-f.userData.hop)/0.9*Math.PI)*0.6; f.userData.hop-=dt*2; } else f.position.y=0;   // happy hop!
           prev=f.position; }); }
@@ -1933,6 +2242,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     clouds.children.forEach(c=>{ c.position.x+=dt*0.6; if(c.position.x>70)c.position.x=-70; });
     // ---- ambient "living world" motion (cheap; runs every frame) ----
     const T = clock.elapsedTime;
+    animateRigs(dt, T);   // every person & animal: breath, blinks, glances, walks, grazing, tails
     // gentle wind sway on trees/plants (pivots from their base at y=0 — play area stays flat)
     for(let i=0;i<swayers.length;i++){ const s=swayers[i], a=s.userData;
       const w = Math.sin(T*1.1 + a.phase)*a.sway; s.rotation.z = w; s.rotation.x = w*0.4; }
@@ -1959,7 +2269,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     requestAnimationFrame(update);
   }
   // test/debug hooks — only exposed with ?debug in the URL, never in the shipped game
+  let dbgCam=null;
   if(/debug/.test(location.search)) window.__ba = {
+    setCam:(o)=>{ dbgCam=o||null; },
+    cheer:()=>celebrate(playerRig,3,true),
     frame, render: ()=>renderer.render(scene,camera), input: inputVec,
     tp: (x,z)=>{ if(player){ player.position.x=x; player.position.z=z; } },
     animalPos: ()=>critters.children.filter(c=>c.userData.kind==='animal'&&!c.userData.caught).map(c=>[+c.position.x.toFixed(1),+c.position.z.toFixed(1)]),
@@ -1983,6 +2296,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   }
   function catchAnimal(a){
     a.userData.caught=true; a.userData.hop=0.9; missionCtx.collected++; missionCtx.followers.push(a);
+    celebrate(playerRig, 1.1, true);                     // happy hop + big smile
+    if(a.userData._rig) celebrate(a.userData._rig, 2.2); // the animal wags along too
     sfxPick(); if(a.userData.type) sfxAnimal(a.userData.type);   // 🐑 the animal cries out!
     spark(a.position.x, a.position.z);
     updateGoal();
@@ -2015,6 +2330,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     } else if(mission.type==='collect'){
       items.children.slice().forEach(it=>{ if(Math.hypot(p.x-it.position.x,p.z-it.position.z)<1.9){
         items.remove(it); missionCtx.collected++; sfxPick(); spark(it.position.x,it.position.z); updateGoal();
+        celebrate(playerRig, .9, true);
         const now=performance.now(); missionCtx.combo=(now-missionCtx.comboT<2600)?missionCtx.combo+1:1; missionCtx.comboT=now;
         if(missionCtx.collected>=missionCtx.target) winMission();
         else { if(missionCtx.combo>=2){ cheer('Combo x'+missionCtx.combo+'! 🔥'); sfxCombo(Math.min(missionCtx.combo,6)); }
@@ -2036,6 +2352,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   let won=false;
   function winMission(){
     if(won) return; won=true; playing=false;
+    celebrate(playerRig, 4, true);                       // the character cheers on the win screen
     timerEl.style.display='none';
     const stars = (missionCtx.timeLimit && missionCtx.overtime) ? 2 : 3;   // beat the clock for all 3
     const p=progress(); p[mission.id]=Math.max(p[mission.id]||0, stars); saveProgress(p);
@@ -2080,6 +2397,67 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       list.appendChild(c); });
   }
   function openMap(){ showScreen('mapScreen'); renderMap(); }
+
+
+  // ---- home screen: the real characters, alive, so the first thing you see is the cast ----
+  (function heroPanel(){
+    const cv = document.getElementById('heroCanvas');
+    if(!cv || typeof THREE === 'undefined') return;
+    let hr=null, hs=null, hc=null, raf=0, built=false;
+
+    function build(){
+      if(built) return true;
+      try{
+        hr = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
+        hr.setPixelRatio(1);                 // hero is decorative — never pay 2x for it
+        hr.shadowMap.enabled = false;        // a 2nd shadow-casting context is too expensive
+        hs = new THREE.Scene();
+        hc = new THREE.PerspectiveCamera(34, 1.8, 0.1, 80);
+
+        hs.add(new THREE.HemisphereLight(0xdff1ff, 0x86a05e, 1.20));
+        const key = new THREE.DirectionalLight(0xfff3da, 1.55);
+        key.position.set(-3.4, 6.4, 6.6); hs.add(key);
+        const rim = new THREE.DirectionalLight(0xcfe4ff, 0.45);
+        rim.position.set(4.2, 3.0, -4.0); hs.add(rim);
+
+        const stage = new THREE.Mesh(new THREE.CircleGeometry(9,48),
+                        new THREE.MeshLambertMaterial({color:0x8fbc5c}));
+        stage.rotation.x = -Math.PI/2; hs.add(stage);
+
+        function keepRig(o){ const r = o && o.userData && o.userData._rig; if(r) r.keep = true; }
+
+        const kid = makePlayer();
+        kid.position.set(0.35,0,0.35); kid.rotation.y = 0.18; hs.add(kid); keepRig(kid);
+
+        try{ const sh = makeNPC('shepherd');
+             sh.position.set(-2.05,0,-0.80); sh.rotation.y = 0.44; hs.add(sh); keepRig(sh); }catch(e){}
+        try{ const sp = makeNPC('mary');
+             sp.position.set(2.15,0,-1.15); sp.rotation.y = -0.40; hs.add(sp); keepRig(sp); }catch(e){}
+        try{ const an = makeAnimal('sheep');
+             an.position.set(2.30,0,0.55); an.rotation.y = -1.05; hs.add(an); keepRig(an); }catch(e){}
+
+        hc.position.set(0.85, 2.55, 7.60);
+        hc.lookAt(-0.10, 1.42, 0);
+        built = true; return true;
+      }catch(e){ built = false; if(hr){ try{hr.dispose();}catch(_){} hr=null; } return false; }
+    }
+
+    function size(){
+      const w = cv.clientWidth||440, h = cv.clientHeight||236;
+      hr.setSize(w,h,false); hc.aspect = w/h; hc.updateProjectionMatrix();
+    }
+    let lastT = 0;
+    function tick(now){
+      const on = document.getElementById('startScreen');
+      if(on && on.classList.contains('show') && (now-lastT) > 41){   // ~24fps is plenty for an idle pose
+        lastT = now;
+        if(build()){ size(); hr.render(hs,hc); }
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    window.addEventListener('resize', ()=>{ if(built) size(); });
+  })();
 
   document.getElementById('playBtn').onclick=()=>{ initAudio(); openMap(); };
   document.getElementById('mapBack').onclick=()=>showScreen('startScreen');
