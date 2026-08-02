@@ -252,6 +252,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function setSky(hex, near, far, night){
     const sky = new THREE.Color(hex);
     scene.background = sky;
+    if(currentEnv && currentEnv.interior){
+      // indoors: no sky, no clouds — warm cedar-dark haze, and the "sun" becomes a high
+      // clerestory-window beam raking across the hall so the columns throw long shadows
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x140c04), 0.30), near||30, far||72);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 1.0; sun.color.set(0xffdfa8);
+      sun.position.set(7, 34, -26);
+      hemi.color.set(0x8a6f48); hemi.groundColor.set(0x2a1c10); hemi.intensity = 0.62;
+      ambLight.color.set(0xffd9a4); ambLight.intensity = 0.34;
+      return;
+    }
     // fog tinted slightly toward the horizon color for a soft, atmospheric gradient feel
     const fogCol = night ? new THREE.Color(hex).lerp(new THREE.Color(0x0a1230), 0.35)
                          : new THREE.Color(hex).lerp(new THREE.Color(0xffffff), 0.28);
@@ -408,6 +419,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         if(i%4===1){ const tw=new THREE.Mesh(boxGeo, skyMats[1]);           // ...and a slim watchtower
           tw.scale.set(bw*0.28, bh*1.8, bw*0.28); tw.position.set(bx+bw*0.5, bh*0.9-1.6, bz); tw.castShadow=false; groundGroup.add(tw); }
       }
+    } else if(env.interior){
+      // indoors — no horizon at all; the biome's own walls enclose the space
     } else {
       // storybook rolling hills
       const hillMat = new THREE.MeshLambertMaterial({color: base[base.length-1].clone().multiplyScalar(0.82).getHex()});
@@ -689,6 +702,104 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     for(let k=0;k<2;k++){ const a=Math.random()*TAU, cx=Math.cos(a)*9, cz=Math.sin(a)*9;   // festive lines overhead
       makeBunting(cx-Math.sin(a)*6, cz+Math.cos(a)*6, cx+Math.sin(a)*6, cz-Math.cos(a)*6); }
   }
+  // ---- Solomon's-temple interior (the 'temple' biome): cedar walls sheathed in gold,
+  //      marble colonnades, the blue/purple/scarlet veils of 2 Chronicles 3:14, golden
+  //      lampstands, and raking shafts of window light with dust hanging in them ----
+  const goldM = new THREE.MeshPhongMaterial({color:0xd9ad3f, shininess:95, specular:0xfff0b8, emissive:0x2a1c06});
+  const ringGeo = new THREE.TorusGeometry(.5, .035, 6, 48);   // thin flat ring for pavement inlay
+  const VEILS = [0x2f4a9e, 0x6a3f8f, 0xa03c30];        // blue, purple and scarlet
+  // shared across temple visits (decor is cleared per mission WITHOUT disposing — never rebuild these)
+  const shaftM=new THREE.MeshBasicMaterial({color:0xffe2a8, transparent:true, opacity:0.10,
+    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide, fog:false});
+  const poolM=new THREE.MeshBasicMaterial({color:0xffe2a8, transparent:true, opacity:0.10,
+    blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const moteM=new THREE.MeshBasicMaterial({color:0xfff2cc, transparent:true, opacity:0.55, fog:false});
+  const shGeo=new THREE.PlaneGeometry(3.8, 27);
+  function templeColumn(x,z){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0xe9dfc4, 0,4.7,0, 1.10,9.4,1.10));                    // marble shaft (the long-shadow caster)
+    g.add(part('cylinder',0xd8cbaa, 0,.30,0, 1.55,.60,1.55));                    // worn plinth
+    const ring=new THREE.Mesh(ugeo('torus'), goldM); ring.position.set(0,8.75,0);
+    ring.scale.set(2.3,2.3,.8); ring.rotation.x=Math.PI/2; ring.castShadow=false; g.add(ring);   // gold collar
+    const cap=new THREE.Mesh(ugeo('sphere'), goldM); cap.position.set(0,9.45,0);
+    cap.scale.set(3.0,.95,3.0); cap.castShadow=false; g.add(cap);                // lily-work capital (1 Kings 7:19)
+    g.position.set(x,0,z); decor.add(g); return g;
+  }
+  function templeVeil(x,z,ry,c){
+    const g=new THREE.Group();
+    const rod=new THREE.Mesh(ugeo('cylinder'), goldM); rod.position.set(0,7.45,0);
+    rod.scale.set(.14,6.4,.14); rod.rotation.z=Math.PI/2; rod.castShadow=false; g.add(rod);
+    const cloth=box(5.6,6.9,.16,c, 0,3.95,0); cloth.castShadow=false; g.add(cloth);
+    const hem=sph(new THREE.Color(c).multiplyScalar(0.72).getHex(), 0,.62,0, 2.9,.34,.22); hem.castShadow=false; g.add(hem); // pooled hem
+    [-1.7,0,1.7].forEach(px=>{ const fold=part('capsule', new THREE.Color(c).multiplyScalar(0.80).getHex(),
+      px,3.9,.10, .22,2.9,.10); fold.castShadow=false; g.add(fold); });          // vertical gathers
+    const brd=box(5.6,.5,.18,0xd9ad3f, 0,6.9,.02); brd.castShadow=false; g.add(brd);   // gold-worked border
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.012); decor.add(g); return g;
+  }
+  function templeLampstand(x,z){
+    const g=new THREE.Group();
+    const stem=new THREE.Mesh(ugeo('cylinder'), goldM); stem.position.set(0,1.35,0); stem.scale.set(.16,2.7,.16); g.add(stem);
+    const base=new THREE.Mesh(ugeo('sphere'), goldM); base.position.set(0,.22,0); base.scale.set(1.05,.42,1.05); g.add(base);
+    const arms=new THREE.Mesh(ugeo('arc'), goldM); arms.position.set(0,2.7,0);
+    arms.scale.set(2.5,2.0,2.5); arms.rotation.z=Math.PI; g.add(arms);           // two arms curving up from the stem
+    [[-1.25,2.80],[0,2.92],[1.25,2.80]].forEach(p=>{
+      const cup=new THREE.Mesh(ugeo('sphere'), goldM); cup.position.set(p[0],p[1],0); cup.scale.set(.42,.20,.42); g.add(cup);
+      const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffdf6a}));
+      fl.position.set(p[0],p[1]+.28,0); fl.scale.set(.20,.55,.20); g.add(fl);
+      const gl=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfff2c0, transparent:true, opacity:.35}));
+      gl.position.set(p[0],p[1]+.26,0); gl.scale.setScalar(.62); g.add(gl);
+    });
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; } });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function templeScenery(){
+    const B=WORLD_R+3.2;
+    // cedar walls overlaid with gold (1 Kings 6:21-22) enclosing the hall just past the clamp
+    for(let side=0;side<4;side++){
+      const horiz=(side<2), off=(side%2?B:-B);
+      const wall=box(horiz?B*2+8:1.4, 12.5, horiz?1.4:B*2+8, 0x8f6c42, horiz?0:off, 6.25, horiz?off:0);
+      wall.castShadow=false; decor.add(wall);
+      const band=box(horiz?B*2+8:1.5, .8, horiz?1.5:B*2+8, 0xd9ad3f, horiz?0:off*0.995, 6.4, horiz?off*0.995:0);
+      band.castShadow=false; decor.add(band);                                    // gold course at eye-height of the columns
+      const skirt=box(horiz?B*2+8:1.5, 1.5, horiz?1.5:B*2+8, 0x5e4426, horiz?0:off*0.995, .75, horiz?off*0.995:0);
+      skirt.castShadow=false; decor.add(skirt);                                  // dark cedar baseboard
+    }
+    // colonnades along each wall, a veil hung in every second bay
+    const B2=WORLD_R+0.8, N=5;
+    let veilIx=0;
+    for(let side=0;side<4;side++){
+      for(let i=0;i<N;i++){
+        const t=-B2+ (i+0.5)*(2*B2)/N;
+        const horiz=(side<2), off=(side%2?B2:-B2);
+        templeColumn(horiz?t:off, horiz?off:t);
+        if(i<N-1 && i%2===0){
+          const tm=-B2+(i+1)*(2*B2)/N;
+          templeVeil(horiz?tm:off, horiz?off:tm, horiz?0:Math.PI/2, VEILS[(veilIx++)%3]);
+        }
+      }
+    }
+    // golden pavement inlay at the heart of the hall (thin cached ring — NOT the fat ugeo torus)
+    [12, 5.5].forEach(s=>{ const inlay=new THREE.Mesh(ringGeo, goldM); inlay.position.set(0,.05,0);
+      inlay.scale.set(s,s,.4); inlay.rotation.x=Math.PI/2; inlay.castShadow=false; decor.add(inlay); });
+    for(let i=0;i<4;i++){ const a=i/4*TAU+Math.PI/4, r=WORLD_R*0.55;             // lampstands mid-hall
+      templeLampstand(Math.cos(a)*r, Math.sin(a)*r); }
+    // shafts of light from the high windows on the up-screen wall (additive, fog-free —
+    // the classic "god rays through the temple smoke" read, for the cost of 3 quads)
+    [-9.5,0,9.5].forEach(sx=>{
+      const sh=new THREE.Mesh(shGeo, shaftM);
+      sh.position.set(sx, 7.6, -WORLD_R+9.5); sh.rotation.x=-0.62; sh.rotation.y=0.06*sx/9.5;
+      decor.add(sh);
+      const pool=new THREE.Mesh(ugeo('sphere'), poolM);                          // warm patch where the beam lands
+      pool.position.set(sx, .06, -WORLD_R+15.5); pool.scale.set(6.0,.02,4.2); decor.add(pool);
+      const motes=new THREE.Group(); motes.position.set(sx, 0, -WORLD_R+13);     // dust hanging in the beam
+      for(let m=0;m<5;m++){ const d=new THREE.Mesh(ugeo('sphere'), moteM);
+        d.position.set((Math.random()-.5)*2.6, 1.5+Math.random()*5.5, (Math.random()-.5)*3.5);
+        d.scale.setScalar(.05+Math.random()*.05); motes.add(d); }
+      windify(motes, 0.02); decor.add(motes);                                    // the sway loop makes the dust drift
+    });
+    const warm=new THREE.PointLight(0xffcf8e, 0.85, 34);                         // soft golden falloff at the heart of the hall
+    warm.position.set(0, 8, 0); decor.add(warm);
+  }
   // a few drifting butterflies for a living, modern feel (persistent, never cleared)
   const butterflies = [];
   (function spawnButterflies(){
@@ -706,6 +817,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     const env = currentEnv || {}, d = env.decor || 'forest';
+    ambient.visible = !env.interior;       // no butterflies drifting through the temple
     const nT=Math.round(WORLD_R*0.55), nR=Math.round(WORLD_R*0.4), nF=Math.round(WORLD_R*0.8);
     if(d==='desert'){
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -715,6 +827,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.5+Math.random()); }
     } else if(d==='city'){
       cityScenery();
+    } else if(d==='temple'){
+      templeScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1579,6 +1693,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const NIGHT_G = [0x2f7a3a,0x357f40,0x2a7136,0x316f3a];
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
   const COBBLE= [0xcfc2a8,0xc4b596,0xd9ccb2,0xb9aa8b];   // worn limestone street (Jerusalem / Susa)
+  const MARBLE= [0xe7dab8,0xdccfa9,0xefe4c6,0xd2c39a];   // polished temple pavement, lamp-warmed
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -1655,7 +1770,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'solomon', name:"Solomon's Golden Temple", emoji:'🏛️', type:'collect', base:9, item:'gold',
       goal:'Help wise King Solomon gather gold to make God’s temple shine!',
       verse:'“Solomon covered the inside of the temple with pure gold.” — 1 Kings 6:21',
-      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+      env:{ ground:MARBLE, water:null, sky:0x2c1e10, fogNear:34, fogFar:80, decor:'temple', interior:true } },
     { id:'elijah', name:'Elijah & the Ravens', emoji:'🐦', type:'collect', base:8, item:'bread',
       goal:'God sent ravens with food for Elijah! Gather the bread by the brook.',
       verse:'“The ravens brought him bread… and he drank from the brook.” — 1 Kings 17:6',
@@ -1679,7 +1794,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'isaiah', name:'Here Am I, Send Me!', emoji:'😮', type:'reach',
       goal:'Isaiah saw God’s glory fill the temple! When God asked who would go, Isaiah said: Here am I — send me! Walk to the glowing altar!',
       verse:'“Then I heard the voice of the Lord saying, ‘Whom shall I send? And who will go for us?’ And I said, ‘Here am I. Send me!’” — Isaiah 6:8',
-      env:{ ground:SAND, water:null, sky:0xf0d0a8, fogFar:86, decor:'desert' } },
+      env:{ ground:MARBLE, water:null, sky:0x33241a, fogNear:26, fogFar:66, decor:'temple', interior:true } },
     { id:'potter', name:'The Potter’s House', emoji:'⚱️', type:'collect', base:8, item:'clay',
       goal:'God shapes us with love, just like a potter shapes soft clay! Gather lumps of clay for the potter’s wheel!',
       verse:'“Like clay in the hand of the potter, so are you in my hand, Israel.” — Jeremiah 18:6',
