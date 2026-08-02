@@ -606,6 +606,101 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
   }
 
+  // ---- Nile / Jordan riverside decor (the 'river' biome) ----
+  // the stream runs along the line x+z=0; riverPt(u,w) gives a point u units along it and
+  // w units to the side (perpendicular). The visible waterline sits at |w|≈2.12 (the same
+  // 2.12 the water shader and ground wet-band use), inWater()'s margin ends at |w|≈2.69.
+  const RSQ=0.7071;
+  function riverPt(u,w){ return [ (u+w)*RSQ, (w-u)*RSQ ]; }
+  const REED_G=[0x5da24b,0x6ab355,0x549a45];
+  function makePapyrus(x,z){
+    // signature Nile plant: tall triangular stems, each crowned with a starburst umbrella tuft
+    const g=new THREE.Group();
+    const n=2+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){
+      const p=pivotAt((Math.random()-.5)*.85, 0, (Math.random()-.5)*.85);
+      p.rotation.z=(Math.random()-.5)*.26; p.rotation.x=(Math.random()-.5)*.26;
+      const H=2.4+Math.random()*1.5, c=REED_G[Math.floor(Math.random()*3)];
+      p.add(part('cylinder',0x6f9c4a, 0,H/2,0, .09,H,.09));
+      for(let k=0;k<3;k++){ const bl=sph(c, 0,H+.10,0, .52,.055,.13); bl.rotation.y=k*Math.PI/3; p.add(bl); }
+      p.add(sph(0x8fce6a, 0,H+.12,0, .15,.10,.15));                            // soft crown knot
+      g.add(p);
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.05); decor.add(g); return g;
+  }
+  function makeBulrush(x,z){
+    // cattails: slender stems with velvet-brown heads and a few arcing blade leaves
+    const g=new THREE.Group();
+    const n=2+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){
+      const p=pivotAt((Math.random()-.5)*.7, 0, (Math.random()-.5)*.7);
+      p.rotation.z=(Math.random()-.5)*.22; p.rotation.x=(Math.random()-.5)*.22;
+      const H=1.7+Math.random()*.9;
+      p.add(part('cylinder',0x568f43, 0,H/2,0, .055,H,.055));
+      p.add(part('capsule',0x6b4a2b, 0,H+.14,0, .17,.19,.17));                 // the brown sausage head
+      p.add(part('cylinder',0x8a6a42, 0,H+.42,0, .028,.24,.028));              // wispy tip
+      g.add(p);
+    }
+    for(let k=0;k<3;k++){ const bl=sph(REED_G[k%3], (Math.random()-.5)*.6,.6,(Math.random()-.5)*.6, .05,.62,.02);
+      bl.rotation.z=(Math.random()-.5)*.7; bl.rotation.y=Math.random()*TAU; g.add(bl); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.06); decor.add(g); return g;
+  }
+  function makeLilyPad(x,z){
+    // floating pad just above the water surface; windify's gentle tilt reads as bobbing
+    const g=new THREE.Group();
+    const s=.7+Math.random()*.6;
+    g.add(sph(0x3f8f3e, 0,.13,0, .60*s,.035,.52*s));
+    if(Math.random()<0.45){                                                     // some carry a pink lotus bud
+      g.add(conePart(0xf7a8c8, .12*s,.34,0, .15,.30));
+      g.add(sph(0xffe08a, .12*s,.20,0, .10,.05,.10));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
+  }
+  function makeEgret(x,z){
+    // a white egret wading at the waterline — stillness with a slow sway of balance
+    const g=new THREE.Group(), W=0xf4f6ee, WD=0xdfe4d6;
+    g.add(part('cylinder',0x4a4234, -.08,.42,0, .035,.84,.035));                // stilt legs
+    g.add(part('cylinder',0x4a4234, .09,.40,.05, .035,.80,.035, .14,0,0));
+    g.add(sph(W, 0,.96,0, .30,.22,.42));                                        // body
+    g.add(sph(WD, 0,1.02,-.34, .14,.10,.26));                                   // folded tail plumes
+    g.add(part('capsule',W, 0,1.32,.28, .13,.16,.13, .55,0,0));                 // S-neck base
+    g.add(part('capsule',W, 0,1.58,.38, .11,.14,.11, -.18,0,0));                // neck upper
+    g.add(sph(W, 0,1.82,.42, .11,.10,.12));                                     // head
+    g.add(conePart(0xe8a83a, 0,1.80,.62, .045,.34, Math.PI/2));                 // dagger beak
+    g.add(sph(0x201a12, -.07,1.85,.47, .022)); g.add(sph(0x201a12, .07,1.85,.47, .022));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.015); decor.add(g); return g;
+  }
+  function riverScenery(){
+    const L=WORLD_R*1.3;
+    // papyrus + bulrush thickets lining both banks (just past inWater's spawn margin)
+    const nB=Math.max(6, Math.round(WORLD_R*0.28));
+    for(let s=-1;s<=1;s+=2){
+      for(let i=0;i<nB;i++){
+        const u=-L+(i+0.5)*(2*L)/nB+(Math.random()-.5)*2.4;
+        const [x,z]=riverPt(u, s*(3.1+Math.random()*2.4));
+        if(Math.hypot(x,z)>5) (Math.random()<0.6?makePapyrus:makeBulrush)(x,z); // keep the spawn point clear
+      }
+      for(let i=0;i<4;i++){                                                     // a nearer cattail row at the water's edge
+        const [x,z]=riverPt((Math.random()-.5)*2*L, s*(2.75+Math.random()*.35));
+        if(Math.hypot(x,z)>5) makeBulrush(x,z);
+      }
+      const [ex,ez]=riverPt((Math.random()-.5)*WORLD_R*1.5, s*2.25);            // one egret wading each side
+      makeEgret(ex,ez);
+    }
+    for(let i=0;i<11;i++){                                                      // lily pads drifting in the shallows
+      const [x,z]=riverPt(-L+Math.random()*2*L, (Math.random()<.5?-1:1)*(0.55+Math.random()*1.15));
+      makeLilyPad(x,z);
+    }
+    // riverside meadow beyond the reed banks
+    for(let i=0;i<Math.round(WORLD_R*0.26);i++){ const [x,z]=randPos(3); if(Math.abs(x+z)>9 && Math.hypot(x,z)>6) makeTree(x,z); }
+    for(let i=0;i<Math.round(WORLD_R*0.45);i++){ const [x,z]=randPos(1); if(Math.abs(x+z)>5.5) makeFlower(x,z); }
+    for(let i=0;i<6;i++){ const [x,z]=randPos(2); if(Math.abs(x+z)>6) makeRock(x,z,0.5+Math.random()*0.6); }
+  }
+
   // ---- Jerusalem stone-street decor (the 'city' biome) ----
   const PLASTERS=[0xd9cdb4,0xcfc0a4,0xc8b795,0xdccfb0], AWNINGS=[0xb54848,0x4a7fb5,0x7a9a4f,0xb5892b];
   function makeHouse(x,z,ry){
@@ -829,6 +924,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       cityScenery();
     } else if(d==='temple'){
       templeScenery();
+    } else if(d==='river'){
+      riverScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1694,6 +1791,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
   const COBBLE= [0xcfc2a8,0xc4b596,0xd9ccb2,0xb9aa8b];   // worn limestone street (Jerusalem / Susa)
   const MARBLE= [0xe7dab8,0xdccfa9,0xefe4c6,0xd2c39a];   // polished temple pavement, lamp-warmed
+  const SEDGE = [0x6fb054,0x7cb95f,0x64a24a,0x94ad62];   // riverbank sedge-green fading into dry khaki
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -1738,7 +1836,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'basket', name:'Baby Moses in the Basket', emoji:'🧺', type:'reach',
       goal:'Baby Moses is floating in a basket among the reeds! Walk along the river and find him!',
       verse:'“She opened it and saw the baby. He was crying, and she felt sorry for him.” — Exodus 2:6',
-      env:{ ground:LUSH, water:'stream', sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:SEDGE, water:'stream', waterColor:0x3f9e7e, sky:0xf2d9a8, fogFar:92, decor:'river' } },
     { id:'bush', name:'The Burning Bush', emoji:'🔥', type:'reach',
       goal:'God spoke to Moses from a bush that burned but never burned up! Walk to the glowing bush!',
       verse:'“Moses saw that though the bush was on fire it did not burn up.” — Exodus 3:2',
@@ -1774,7 +1872,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'elijah', name:'Elijah & the Ravens', emoji:'🐦', type:'collect', base:8, item:'bread',
       goal:'God sent ravens with food for Elijah! Gather the bread by the brook.',
       verse:'“The ravens brought him bread… and he drank from the brook.” — 1 Kings 17:6',
-      env:{ ground:GREEN, water:'stream', sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:SEDGE, water:'stream', sky:0x8fd0ff, decor:'river' } },
     { id:'elijahangel', name:'Elijah & the Angel', emoji:'😇', type:'reach',
       goal:'Tired Elijah fell asleep in the desert — but God sent an angel with warm bread and water! Walk to the angel by the broom tree!',
       verse:'“All at once an angel touched him and said, ‘Get up and eat.’ He looked around, and there by his head was some bread baked over hot coals, and a jar of water.” — 1 Kings 19:5-6',
@@ -1834,7 +1932,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'baptism', name:'Jesus Is Baptized', emoji:'🕊️', type:'reach',
       goal:'At the Jordan River, God’s Spirit came down like a gentle dove! Walk to Jesus at the river!',
       verse:'“And a voice from heaven said, ‘This is my Son, whom I love; with him I am well pleased.’” — Matthew 3:17',
-      env:{ ground:GREEN, water:'stream', sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:SEDGE, water:'stream', waterColor:0x39a0c8, sky:0x9fd8ff, decor:'river' } },
     { id:'fishers', name:'Fishers of Men', emoji:'🐟', type:'collect', base:9, item:'fish',
       goal:'Jesus called fishermen to be His helpers! Gather the fish along the shore, then follow Him!',
       verse:'“‘Come, follow me,’ Jesus said, ‘and I will send you out to fish for people.’” — Matthew 4:19',
@@ -1878,7 +1976,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'lydia', name:'Lydia by the River', emoji:'🧵', type:'collect', base:8, item:'cloth',
       goal:'By the river, Lydia the cloth seller heard about Jesus and believed! Help her gather her beautiful purple cloths!',
       verse:'“One of those listening was a woman… named Lydia, a dealer in purple cloth… The Lord opened her heart to respond to Paul’s message.” — Acts 16:14',
-      env:{ ground:GREEN, water:'stream', sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:SEDGE, water:'stream', sky:0x9fd8ff, decor:'river' } },
     { id:'prisonsong', name:'Paul & Silas Sing', emoji:'🎵', type:'collect', base:9, item:'note',
       goal:'At midnight Paul and Silas sang to God in prison — and the doors flew open! Gather their songs of praise!',
       verse:'“About midnight Paul and Silas were praying and singing hymns to God… At once all the prison doors flew open, and everyone’s chains came loose.” — Acts 16:25-26',
