@@ -270,6 +270,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function setSky(hex, near, far, night){
     const sky = new THREE.Color(hex);
     scene.background = sky;
+    if(currentEnv && currentEnv.decor==='heaven'){
+      // the New Jerusalem needs no sun (Rev 21:23): a star-strewn violet dusk where the
+      // warm key light pours OUT of the city itself, up-screen, backlighting the pilgrim's walk
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x35225e), 0.5), near||46, far||104);
+      starField.visible = true; clouds.visible = false;
+      sun.intensity = 1.0; sun.color.set(0xffd98e);
+      sun.position.set(-30, 34, -30);              // golden glory streaming from the gate's diagonal
+      hemi.color.set(0x8a76b4); hemi.groundColor.set(0x6a5438); hemi.intensity = 0.62;
+      ambLight.color.set(0xffe2b0); ambLight.intensity = 0.46;   // the city's own glow fills every shadowed face
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -1280,6 +1291,95 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const warmB=new THREE.PointLight(0xffb066, 1.2, 34); warmB.position.set(TR-2, 4.2, -TR*0.5); decor.add(warmB);
   }
 
+  // ---- The New Jerusalem (the 'heaven' biome — Revelation 21): the grand finale.
+  //      A violet, star-strewn dusk where every scrap of light pours out of the CITY
+  //      itself — a jasper wall crowned in glowing gold up-screen, radiant spires hazing
+  //      into the far violet, a shining gold path that leads a small child's eye straight
+  //      to the gate of pearl, crystal trees with golden fruit, glory drifting on the air ----
+  const HC_A = Math.PI*1.25;                       // the city waits up-screen on the (-x,-z) diagonal
+  const glowGoldM  = new THREE.MeshBasicMaterial({color:0xffe9a0});
+  const glowPearlM = new THREE.MeshBasicMaterial({color:0xfff6dc});
+  const gloryShaftM = new THREE.MeshBasicMaterial({color:0xffe9b0, transparent:true, opacity:0.12,
+    blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const goldPoolM = new THREE.MeshBasicMaterial({color:0xffdf94, transparent:true, opacity:0.22,
+    blending:THREE.AdditiveBlending, depthWrite:false});
+  const spireM = [new THREE.MeshBasicMaterial({color:0xf3e2ac}), new THREE.MeshBasicMaterial({color:0xe9d494}),
+                  new THREE.MeshBasicMaterial({color:0xfaeec6})];  // self-lit golds — the city IS the light (fog hazes the far ones)
+  function heavenLamp(x,z){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0xcfc196, 0,1.15,0, .15,2.3,.15));           // slim white-gold lampstand
+    g.add(part('cylinder',0xbfae84, 0,.12,0, .5,.24,.5));              // base
+    const orb=new THREE.Mesh(ugeo('sphere'), glowPearlM); orb.position.y=2.55; orb.scale.setScalar(.52); g.add(orb);
+    const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffedb8, transparent:true, opacity:.26}));
+    halo.position.y=2.55; halo.scale.setScalar(1.15); g.add(halo);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); decor.add(g);
+    const pool=new THREE.Mesh(ugeo('sphere'), goldPoolM);              // warm pool it throws on the gold street
+    pool.position.set(x,.05,z); pool.scale.set(4.6,.02,4.6); decor.add(pool);
+  }
+  function heavenTree(x,z){                        // a crystal tree of life bearing golden fruit (Rev 22:2)
+    const g=new THREE.Group();
+    g.add(part('cylinder',0xd8c491, 0,.95,0, .30,1.9,.30));
+    const c1=new THREE.Mesh(ugeo('blob'), flatMat(0x9fd4b4)); c1.position.set(0,2.55,0);
+    c1.scale.set(2.5,2.0,2.5); c1.rotation.y=Math.random()*TAU; g.add(c1);
+    const c2=new THREE.Mesh(ugeo('blob'), flatMat(0xbde6c8)); c2.position.set(.5,3.3,.3);
+    c2.scale.set(1.5,1.2,1.5); c2.rotation.y=Math.random()*TAU; g.add(c2);
+    for(let f=0;f<3;f++){ const fr=new THREE.Mesh(ugeo('sphere'), glowGoldM);
+      const a=f*2.1+Math.random(); fr.position.set(Math.cos(a)*1.3, 2.1+f*.5, Math.sin(a)*1.3);
+      fr.scale.setScalar(.24); g.add(fr); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.04); decor.add(g);
+  }
+  function heavenScenery(){
+    const CA=HC_A, gR=WORLD_R-6, gx=Math.cos(CA)*gR, gz=Math.sin(CA)*gR;  // must match the gate placement in startMission
+    // jasper wall arc flanking the gate, every course crowned with glowing gold
+    for(let s=-7;s<=7;s++){
+      if(Math.abs(s)<2) continue;                                       // the gate ensemble itself fills the middle
+      const a=CA+s*0.16, r=WORLD_R+2.5, wx=Math.cos(a)*r, wz=Math.sin(a)*r;
+      const seg=box(7.6,5.4,1.7, 0xcfe0cc, wx,2.7,wz); seg.rotation.y=-a+Math.PI/2; seg.castShadow=false; decor.add(seg);
+      const crown=new THREE.Mesh(boxGeo, glowGoldM); crown.scale.set(7.8,.42,1.9);
+      crown.position.set(wx,5.6,wz); crown.rotation.y=-a+Math.PI/2; decor.add(crown);
+      if(s%2===0){ const tw=new THREE.Mesh(ugeo('cylinder'), mat(0xdcead6)); tw.scale.set(1.8,7.6,1.8);
+        tw.position.set(wx,3.8,wz); tw.castShadow=false; decor.add(tw);
+        const cap=new THREE.Mesh(ugeo('cone'), glowGoldM); cap.scale.set(2.2,1.8,2.2);
+        cap.position.set(wx,8.4,wz); decor.add(cap); }
+    }
+    // the radiant skyline of the city rising behind the wall, hazing into the violet distance
+    for(let i=0;i<13;i++){
+      const a=CA+(Math.random()-.5)*1.35, r=WORLD_R*1.45+Math.random()*WORLD_R*0.95;
+      const px=Math.cos(a)*r, pz=Math.sin(a)*r, h=9+Math.random()*17, w=2.0+Math.random()*2.8;
+      const tw=new THREE.Mesh(ugeo('cylinder'), spireM[i%3]); tw.scale.set(w,h,w);
+      tw.position.set(px,h/2,pz); tw.castShadow=false; decor.add(tw);
+      const cap=new THREE.Mesh(ugeo('cone'), glowPearlM); cap.scale.set(w*1.15,2.2+h*0.12,w*1.15);
+      cap.position.set(px,h+1.1+h*0.06,pz); cap.castShadow=false; decor.add(cap);
+    }
+    // shafts of glory climbing out of the city into the stars
+    for(let s=0;s<3;s++){ const a=CA+(s-1)*0.32, r=WORLD_R*1.4;
+      const b=new THREE.Mesh(ugeo('cylinder'), gloryShaftM);
+      b.scale.set(5+s*2, 34, 5+s*2); b.position.set(Math.cos(a)*r, 15, Math.sin(a)*r); decor.add(b); }
+    // the shining way: pools of gold light that lead a little pilgrim straight to the gate
+    for(let s=1;s<=5;s++){ const t=s/6, wob=Math.sin(s*2.4)*1.4;
+      const px=gx*t - Math.sin(CA)*wob, pz=gz*t + Math.cos(CA)*wob;
+      const pool=new THREE.Mesh(ugeo('sphere'), goldPoolM);
+      pool.position.set(px,.05,pz); pool.scale.set(3.4+t*2.4,.02,3.4+t*2.4); decor.add(pool); }
+    // lampstands flanking the way
+    [.3,.62,.9].forEach(t=>{ const ox=-Math.sin(CA)*4.4, oz=Math.cos(CA)*4.4;
+      heavenLamp(gx*t+ox, gz*t+oz); heavenLamp(gx*t-ox, gz*t-oz); });
+    // crystal trees on the open plain (kept clear of the shining way and the gate)
+    let placed=0, guard=0;
+    while(placed<8 && guard++<60){ const [x,z]=randPos(3);
+      const len=Math.hypot(gx,gz), tt=Math.max(0,Math.min(1,(x*gx+z*gz)/(len*len)));
+      const dPath=Math.hypot(x-gx*tt, z-gz*tt);
+      if(Math.hypot(x-gx,z-gz)>7 && dPath>6 && Math.hypot(x,z)>6){ heavenTree(x,z); placed++; }
+    }
+    // glory drifting on the air
+    const motes=new THREE.Group();
+    for(let m=0;m<9;m++){ const d=new THREE.Mesh(ugeo('sphere'), moteM);
+      d.position.set((Math.random()-.5)*WORLD_R*1.4, 1+Math.random()*5, (Math.random()-.5)*WORLD_R*1.4);
+      d.scale.setScalar(.06+Math.random()*.06); motes.add(d); }
+    windify(motes, 0.03); decor.add(motes);
+  }
+
   // a few drifting butterflies for a living, modern feel (persistent, never cleared)
   const butterflies = [];
   (function spawnButterflies(){
@@ -1318,6 +1418,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       wheatScenery();
     } else if(d==='den'){
       denScenery();
+    } else if(d==='heaven'){
+      heavenScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1736,20 +1838,33 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const glow = new THREE.PointLight(0xffe14d, 2, 30); g.add(glow);
     g.position.set(x,y,z); g.scale.setScalar(1.2); return g;
   }
-  function makeHeavenCity(){   // the New Jerusalem — a golden city that needs no sun (Revelation 21)
+  function makeHeavenCity(){   // the gate of the New Jerusalem — pearl arch, jasper walls, glory pouring out (Rev 21)
     const g = new THREE.Group();
-    const glowM = new THREE.MeshBasicMaterial({color:0xffe9a0});
-    const wallM = new THREE.MeshBasicMaterial({color:0xf2cf6a});
-    g.add(box(10,1.2,8,0xd8cba8, 0,.6,0));                          // hill-top platform
-    const wall=new THREE.Mesh(boxGeo, wallM); wall.scale.set(8.6,2.2,6.6); wall.position.set(0,2.2,0); g.add(wall);
-    const gate=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfdf4ea}));
-    gate.scale.set(1.0,1.5,.4); gate.position.set(0,2.0,3.35); g.add(gate);   // a gate of pearl (Rev 21:21)
-    [[-3.2,-2.2],[3.2,-2.2],[-3.2,2.2],[3.2,2.2],[0,-1.0]].forEach((t,i)=>{
-      const h=3.4+(i===4?2.2:0);
-      const tw=new THREE.Mesh(ugeo('cylinder'), wallM); tw.scale.set(.9,h,.9); tw.position.set(t[0],1.2+h/2,t[1]); g.add(tw);
-      const cap=new THREE.Mesh(ugeo('cone'), glowM); cap.scale.set(1.1,1.4,1.1); cap.position.set(t[0],1.2+h+.7,t[1]); g.add(cap);
-    });
-    const gl=new THREE.PointLight(0xffe9a0, 2.2, 34); gl.position.set(0,6,0); g.add(gl);
+    // platform and a wide welcome step toward the pilgrim (local +z faces the player)
+    g.add(box(13,1.0,8,0xe2d4a4, 0,.5,-.6));
+    g.add(box(9.6,.5,2.4,0xeee0b4, 0,.25,3.6));
+    // flanking jasper walls, crowned with glowing gold
+    [-4.5,4.5].forEach(x=>{ g.add(box(4.4,5.2,1.7,0xcfe0cc, x,2.6,-.8));
+      const cr=new THREE.Mesh(boxGeo, glowGoldM); cr.scale.set(4.6,.42,1.9); cr.position.set(x,5.4,-.8); g.add(cr); });
+    // twin gate towers
+    [-2.5,2.5].forEach(x=>{ const tw=new THREE.Mesh(ugeo('cylinder'), mat(0xdcead6));
+      tw.scale.set(1.5,7.4,1.5); tw.position.set(x,3.7,-.8); g.add(tw);
+      const cap=new THREE.Mesh(ugeo('cone'), glowGoldM); cap.scale.set(1.9,1.9,1.9); cap.position.set(x,8.05,-.8); g.add(cap); });
+    // the gate of pearl: one luminous arch with the great pearl at its crown (Rev 21:21)
+    const arch=new THREE.Mesh(ugeo('arc'), glowPearlM); arch.scale.set(5.4,7.6,5.4);
+    arch.position.set(0,1.0,.5); g.add(arch);
+    const pearl=new THREE.Mesh(ugeo('sphere'), glowPearlM); pearl.position.set(0,5.3,.5); pearl.scale.setScalar(1.15); g.add(pearl);
+    const pHalo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfff1c4, transparent:true, opacity:.25}));
+    pHalo.position.copy(pearl.position); pHalo.scale.setScalar(2.1); g.add(pHalo);
+    // the glory inside, glimpsed through the open gate
+    const glory=new THREE.Mesh(boxGeo, glowPearlM); glory.scale.set(4.2,4.6,.4); glory.position.set(0,2.9,-1.5); g.add(glory);
+    // gold spilling down the steps and out onto the plain toward the pilgrim
+    const spill=new THREE.Mesh(ugeo('sphere'), goldPoolM); spill.position.set(0,.06,5.4);
+    spill.scale.set(5.4,.02,8.6); g.add(spill);
+    // a great beam of glory climbing into the stars
+    const beam=new THREE.Mesh(ugeo('cylinder'), gloryShaftM); beam.scale.set(6.4,26,6.4);
+    beam.position.set(0,13,-.4); g.add(beam);
+    const gl=new THREE.PointLight(0xffe9a0, 2.6, 44); gl.position.set(0,6,3); g.add(gl);
     g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
     return g;
   }
@@ -2186,6 +2301,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SEDGE = [0x6fb054,0x7cb95f,0x64a24a,0x94ad62];   // riverbank sedge-green fading into dry khaki
   const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
   const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
+  const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2386,7 +2502,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'heavencity', name:'The Shining City', emoji:'🌟', type:'reach',
       goal:'One day God’s golden city will shine forever — it needs no sun! Walk to the city of God!',
       verse:'“The city does not need the sun or the moon to shine on it, for the glory of God gives it light, and the Lamb is its lamp.” — Revelation 21:23',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:GLORY, water:null, sky:0x1a1246, fogNear:46, fogFar:104, decor:'heaven', night:true } },
   ];
   const ANIMAL_TYPES = ['sheep','lion','cow','elephant','pig','giraffe','chicken','zebra'];
 
@@ -2646,11 +2762,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         fallen.position.set(fx,0,fz); fallen.rotation.y=Math.atan2(fx,fz); props.add(fallen);
         const jesus=makeNPC('jesus'); jesus.position.set(3,0,3); jesus.rotation.y=Math.atan2(gx-3,gz-3); props.add(jesus);
         say('The wise man built on the rock! Walk to the sturdy house! 🏠🪨',4200);
-      } else if(mission.id==='heavencity'){ // the New Jerusalem glows golden in the night
-        const R=WORLD_R-6, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+      } else if(mission.id==='heavencity'){ // the New Jerusalem — pinned up-screen so the wall, gold path and glory light all line up on it
+        const R=WORLD_R-6, gx=Math.cos(HC_A)*R, gz=Math.sin(HC_A)*R;
         const city=makeHeavenCity(); city.position.set(gx,0,gz); city.rotation.y=Math.atan2(-gx,-gz); props.add(city); missionCtx.goalObj=city;
         const angel=makeNPC('angel'); angel.position.set(3,0,3); angel.rotation.y=Math.atan2(gx-3,gz-3); props.add(angel);
-        say('God’s city shines brighter than the sun! Walk to the golden city! 🌟',4200);
+        say('God’s city shines brighter than the sun! Follow the golden light to the gate! 🌟',4200);
       } else if(mission.id==='esther'){ // the Persian palace — Esther goes bravely before the king
         const R=WORLD_R-6, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
         const pal=new THREE.Group(); pal.position.set(gx,0,gz); pal.rotation.y=Math.atan2(-gx,-gz);
