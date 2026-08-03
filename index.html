@@ -44,6 +44,23 @@
   #stickHint { position: absolute; left: 30px; bottom: 162px; color: #fff; font-weight: 800; font-size: 13px;
     text-shadow: 0 2px 5px rgba(0,0,0,.5); background: rgba(0,0,0,.25); padding: 5px 10px; border-radius: 12px; }
 
+  /* Off-screen goal compass — an emoji chip pinned to the screen edge with an arrow
+     that points at the mission destination whenever it's out of frame */
+  #goalCue { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none;
+    opacity: 0; transition: opacity .35s ease; will-change: transform; z-index: 12; }
+  #goalCue.show { opacity: 1; }
+  #gcRot { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  #gcArrow { position: absolute; left: 31px; top: -13px; width: 26px; height: 26px; overflow: visible;
+    filter: drop-shadow(0 2px 4px rgba(10,30,70,.4)); animation: gcNudge 1.1s ease-in-out infinite; }
+  #gcChip { position: absolute; left: -27px; top: -27px; width: 54px; height: 54px; border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(230,241,255,.93));
+    border: 2.5px solid rgba(255,255,255,.95);
+    box-shadow: 0 6px 18px rgba(15,35,85,.3), inset 0 -3px 6px rgba(90,140,220,.16);
+    display: flex; align-items: center; justify-content: center; font-size: 27px;
+    animation: gcBreathe 1.6s ease-in-out infinite; }
+  @keyframes gcNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+  @keyframes gcBreathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+
   /* Buddy speech bubble */
   #say { position: absolute; right: 14px; top: 64px; max-width: 210px; pointer-events: none;
     background: #fff; color: #223; font-weight: 700; font-size: 14px; padding: 10px 14px;
@@ -139,6 +156,7 @@
   <div id="say"></div>
   <div id="stickHint">Drag to move! 🕹️</div>
   <div id="stick"><div id="knob"></div></div>
+  <div id="goalCue"><div id="gcRot"><svg id="gcArrow" viewBox="0 0 26 26"><path d="M4 5 L22 13 L4 21 L9 13 Z" fill="#ffd23e" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></svg></div><div id="gcChip">⭐</div></div>
   <div id="timer"></div>
   <div id="popCheer"></div>
 </div>
@@ -2702,6 +2720,45 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     camera.position.set(p.x+CAM_D, n?CAM_H_NIGHT:CAM_H, p.z+CAM_D); camera.lookAt(p.x, n?2.5:1.5, p.z); }
   const clock = new THREE.Clock();
 
+  // ---- off-screen goal compass ----
+  // Little kids can't read a map: whenever the mission destination is out of frame
+  // (or tucked under the joystick / top banner), a friendly emoji chip pins to the
+  // screen edge with an arrow pointing the way, and melts away once the goal is
+  // genuinely visible. Only for destinations you WALK to — reach goals, and gather
+  // goals once every animal is collected. find-missions stay a secret (no spoilers).
+  const goalCueEl=document.getElementById('goalCue'), gcRotEl=document.getElementById('gcRot'),
+        gcChipEl=document.getElementById('gcChip');
+  let gcEmoji='';
+  const gcVec=new THREE.Vector3();
+  function cueTarget(){
+    if(!missionCtx || !mission || !missionCtx.goalObj || !missionCtx.goalObj.parent) return null;
+    if(mission.type==='reach') return missionCtx.goalObj;
+    if(mission.type==='gather' && missionCtx.collected>=missionCtx.target) return missionCtx.goalObj;
+    return null;
+  }
+  function updateGoalCue(){
+    const g = playing ? cueTarget() : null;
+    if(!g){ goalCueEl.classList.remove('show'); return; }
+    const W=innerWidth, H=innerHeight;
+    camera.updateMatrixWorld();   // refresh matrixWorldInverse — the camera moved this frame, render hasn't run yet
+    gcVec.copy(g.position); gcVec.y+=2.2; gcVec.project(camera);
+    const behind=gcVec.z>1;
+    let sx=( gcVec.x*0.5+0.5)*W, sy=(-gcVec.y*0.5+0.5)*H;
+    if(behind){ sx=W-sx; sy=H-sy; }   // behind the camera: mirror through center so the arrow still aims right
+    // "visible" means truly readable: on screen AND not hidden by the joystick or the goal banner
+    const inJoy = sx<210 && sy>H-225;
+    if(!behind && sx>36 && sx<W-36 && sy>96 && sy<H-40 && !inJoy){ goalCueEl.classList.remove('show'); return; }
+    // pin the chip inside a safe rectangle, then nudge it out of the joystick's corner
+    let x=clamp(sx,60,W-60), y=clamp(sy,112,H-70);
+    if(x<216 && y>H-232){ if((216-x) < (y-(H-232))) x=216; else y=H-232; }
+    const ang=Math.atan2(sy-y, sx-x);   // aim from the pinned chip toward the real target
+    goalCueEl.style.transform='translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+    gcRotEl.style.transform='rotate('+ang.toFixed(3)+'rad)';
+    const em=(mission.reachLabel && (mission.reachLabel.match(/\p{Extended_Pictographic}[\u200d\ufe0f\p{Extended_Pictographic}]*/gu)||[]).pop()) || mission.emoji || '⭐';
+    if(em!==gcEmoji){ gcEmoji=em; gcChipEl.textContent=em; }
+    goalCueEl.classList.add('show');
+  }
+
   function frame(dt){
     if(playing && player){
       // input: joystick + keys
@@ -2800,6 +2857,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       bf.rotation.y = -u.ang;
       const flap=Math.sin(T*14+u.ph)*0.9; u.wl.rotation.z=flap; u.wr.rotation.z=-flap;
     }
+    updateGoalCue();   // after the camera has settled for this frame, so the projection matches what's drawn
   }
   function update(){
     const dt = Math.min(0.05, clock.getDelta());
