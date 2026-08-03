@@ -828,6 +828,170 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       makeIbex(Math.cos(a)*r, Math.sin(a)*r); }
   }
 
+  // ---- Harvest-field decor (the 'wheat' biome — Ruth, the Sower, Joseph's grain) ----
+  // The whole standing crop is ONE InstancedMesh (a 3-stalk tuft, vertex-colored straw+gold),
+  // so hundreds of tufts cost a single draw call. Each tuft bends from its base every frame:
+  // a slow wind swell rolls across the field, the crop leans away from every sparkle item so
+  // pickups sit in a little sunlit pocket, and the stalks part around the player as they wade
+  // through — the biome's signature "the grain moves when I touch it" moment.
+  const WHEAT_MAX = 850;
+  let wheatMesh = null, wheatOn = false;
+  const wheatI = { n:0, bx:new Float32Array(WHEAT_MAX), bz:new Float32Array(WHEAT_MAX),
+    s:new Float32Array(WHEAT_MAX), ph:new Float32Array(WHEAT_MAX),
+    lx:new Float32Array(WHEAT_MAX), lz:new Float32Array(WHEAT_MAX),      // current lean (eases toward target = springy)
+    ix:new Float32Array(WHEAT_MAX), iz:new Float32Array(WHEAT_MAX),      // permanent lean-away-from-item clearing
+    qy:new Float32Array(WHEAT_MAX), clr:false };
+  function mergeGeos(list){   // tiny indexed merge (pos+normal+per-piece color) — no jsm utils in the inlined build
+    let vt=0, it=0; list.forEach(([g])=>{ vt+=g.attributes.position.count; it+=g.index.count; });
+    const pos=new Float32Array(vt*3), nor=new Float32Array(vt*3), col=new Float32Array(vt*3),
+          idx=new (vt>65535?Uint32Array:Uint16Array)(it);
+    let vo=0, io=0; const c=new THREE.Color();
+    list.forEach(([g,hex])=>{ const n=g.attributes.position.count;
+      pos.set(g.attributes.position.array, vo*3); nor.set(g.attributes.normal.array, vo*3);
+      c.set(hex); for(let i=0;i<n;i++){ col[(vo+i)*3]=c.r; col[(vo+i)*3+1]=c.g; col[(vo+i)*3+2]=c.b; }
+      const gi=g.index.array; for(let i=0;i<gi.length;i++) idx[io+i]=gi[i]+vo;
+      vo+=n; io+=gi.length; g.dispose(); });
+    const out=new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nor,3));
+    out.setAttribute('color', new THREE.BufferAttribute(col,3));
+    out.setIndex(new THREE.BufferAttribute(idx,1)); return out;
+  }
+  function wheatTuftGeo(){
+    if(geoCache.wheatTuft) return geoCache.wheatTuft;
+    const pieces=[], STALKS=[0xc3a85a,0xcdb264,0xbba053], HEADS=[0xe8c968,0xf0d47a,0xdfbd5c];
+    [[0,0,1.32,0],[.17,.11,1.08,.14],[-.15,-.12,1.18,-.11]].forEach(([ox,oz,h,tl],i)=>{
+      const st=new THREE.ConeGeometry(.05,1,5); st.scale(1,h,1); st.rotateZ(tl); st.translate(ox,h/2,oz);
+      pieces.push([st, STALKS[i]]);
+      const hd=new THREE.SphereGeometry(.5,6,5); hd.scale(.15,.42,.15); hd.rotateZ(tl);
+      hd.translate(ox-Math.sin(tl)*h*.5, h*.99+.10, oz);                 // nodding head riding the tip
+      pieces.push([hd, HEADS[i]]);
+    });
+    return geoCache.wheatTuft = mergeGeos(pieces);
+  }
+  function wheatField(){
+    if(!wheatMesh){   // singleton, reused across missions — no per-mission GPU-buffer churn
+      wheatMesh = new THREE.InstancedMesh(wheatTuftGeo(),
+        new THREE.MeshLambertMaterial({vertexColors:true}), WHEAT_MAX);
+      wheatMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      wheatMesh.castShadow=false; wheatMesh.receiveShadow=false; wheatMesh.frustumCulled=false;
+    }
+    const fa=Math.random()*TAU, fr=WORLD_R*0.52,                          // threshing-floor site — crop keeps off it
+          fx=Math.cos(fa)*fr, fz=Math.sin(fa)*fr;
+    const lim=WORLD_R-1.4, step=Math.max(1.05,(2*lim)/48), cand=[];
+    for(let gx=-lim; gx<=lim; gx+=step) for(let gz=-lim; gz<=lim; gz+=step){
+      const x=gx+(Math.random()-.5)*.9, z=gz+(Math.random()-.5)*.9;
+      // smooth noise gates planting into drifts with open lanes — a field with paths, not a carpet
+      const nz=Math.sin(x*.21)*Math.cos(z*.17)+Math.sin((x-z)*.11)+Math.cos(x*.06+z*.13)*.7;
+      if(nz<.12) continue;
+      if(Math.hypot(x,z)<3.4) continue;                                   // spawn stays clear
+      if(Math.hypot(x-fx,z-fz)<4.6) continue;                             // threshing floor stays clear
+      cand.push([x,z]);
+    }
+    for(let i=cand.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)), t=cand[i]; cand[i]=cand[j]; cand[j]=t; }
+    const n=Math.min(cand.length, WHEAT_MAX), col=new THREE.Color(), dummy=new THREE.Object3D();
+    for(let i=0;i<n;i++){
+      wheatI.bx[i]=cand[i][0]; wheatI.bz[i]=cand[i][1];
+      wheatI.s[i]=.85+Math.random()*.4; wheatI.ph[i]=Math.random()*TAU; wheatI.qy[i]=Math.random()*TAU;
+      wheatI.lx[i]=0; wheatI.lz[i]=0; wheatI.ix[i]=0; wheatI.iz[i]=0;
+      const v=.86+Math.random()*.22;                                      // near-neutral tint so patches shimmer, not stripe
+      col.setRGB(v, v*(.94+Math.random()*.1), v*(.85+Math.random()*.2));
+      wheatMesh.setColorAt(i, col);
+      dummy.position.set(cand[i][0],0,cand[i][1]); dummy.rotation.set(0,wheatI.qy[i],0);
+      dummy.scale.set(1,wheatI.s[i],1); dummy.updateMatrix(); wheatMesh.setMatrixAt(i,dummy.matrix);
+    }
+    wheatI.n=n; wheatI.clr=false; wheatMesh.count=n;
+    if(wheatMesh.instanceColor) wheatMesh.instanceColor.needsUpdate=true;
+    wheatMesh.instanceMatrix.needsUpdate=true;
+    decor.add(wheatMesh); wheatOn=true;
+    return [fx,fz];
+  }
+  const _wq=new THREE.Quaternion(), _wqy=new THREE.Quaternion(), _wax=new THREE.Vector3(),
+        _wup=new THREE.Vector3(0,1,0), _wp=new THREE.Vector3(), _ws=new THREE.Vector3(1,1,1), _wm=new THREE.Matrix4();
+  function updateWheat(dt,T){
+    if(!wheatOn || !wheatMesh || !wheatMesh.parent) return;
+    if(!wheatI.clr && items.children.length){   // one-time (items exist by the first frame): part the crop around every pickup
+      for(let i=0;i<wheatI.n;i++){
+        let ax=0, az=0;
+        for(let k=0;k<items.children.length;k++){ const it=items.children[k];
+          const dx=wheatI.bx[i]-it.position.x, dz=wheatI.bz[i]-it.position.z, d=Math.hypot(dx,dz);
+          if(d<1.5 && d>.01){ const f=(1-d/1.5)/d; ax+=dx*f; az+=dz*f; } }
+        wheatI.ix[i]=Math.max(-1,Math.min(1,ax))*.55; wheatI.iz[i]=Math.max(-1,Math.min(1,az))*.55;
+      }
+      wheatI.clr=true;
+    }
+    const px=player?player.position.x:1e5, pz=player?player.position.z:1e5, k=Math.min(1, dt*6);
+    for(let i=0;i<wheatI.n;i++){
+      const bx=wheatI.bx[i], bz=wheatI.bz[i];
+      // slow wind swell rolling across the field + each tuft's own flutter + the item pocket
+      let tx=.06+Math.sin(T*1.15+bx*.28+bz*.12)*.075+Math.sin(T*3.1+wheatI.ph[i])*.022+wheatI.ix[i],
+          tz=Math.cos(T*.9+wheatI.ph[i])*.03+wheatI.iz[i];
+      const dx=bx-px, dz=bz-pz, d2=dx*dx+dz*dz;
+      if(d2<3.6){ const d=Math.sqrt(d2)||.01, f=(1-d/1.9)*1.05/d; tx+=dx*f; tz+=dz*f; }  // part around the player
+      const lx=wheatI.lx[i]+=(tx-wheatI.lx[i])*k, lz=wheatI.lz[i]+=(tz-wheatI.lz[i])*k;
+      const len=Math.hypot(lx,lz);
+      if(len>.003){ _wax.set(lz/len,0,-lx/len); _wq.setFromAxisAngle(_wax, Math.min(len,1.25)); }
+      else _wq.identity();
+      _wqy.setFromAxisAngle(_wup, wheatI.qy[i]); _wq.multiply(_wqy);
+      _wp.set(bx,0,bz); _ws.y=wheatI.s[i];
+      _wm.compose(_wp,_wq,_ws); wheatMesh.setMatrixAt(i,_wm);
+    }
+    wheatMesh.instanceMatrix.needsUpdate=true;
+  }
+  function makeSheaf(x,z){
+    // a bound standing sheaf: outer stalks flare from a rope belt, golden heads nod from the crown
+    const g=new THREE.Group(), STRAW=0xd2b569, STRAW2=0xc4a65a;
+    g.add(part('cylinder',STRAW, 0,.9,0, .5,1.8,.5));                     // core bundle (the one shadow caster)
+    for(let i=0;i<7;i++){ const a=i/7*TAU;
+      const st=part('cylinder', i%2?STRAW:STRAW2, Math.cos(a)*.34,.85,Math.sin(a)*.34, .13,1.7,.13);
+      st.rotation.z=-Math.cos(a)*.22; st.rotation.x=Math.sin(a)*.22; st.castShadow=false; g.add(st); }
+    const rope=part('torus',0x9c7a44, 0,.78,0, .62,.62,.5, Math.PI/2,0,0); rope.castShadow=false; g.add(rope);
+    for(let i=0;i<6;i++){ const a=i/6*TAU+.3;
+      const hd=sph(0xe8c968, Math.cos(a)*.42,1.92,Math.sin(a)*.42, .09,.24,.09);
+      hd.rotation.z=-Math.cos(a)*.5; hd.rotation.x=Math.sin(a)*.5; hd.castShadow=false; g.add(hd); }
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.015); decor.add(g); return g;
+  }
+  function makeSparrow(x,z){
+    // a plump little sparrow pecking spilled grain (the Sower's hungry birds)
+    const g=new THREE.Group();
+    g.add(sph(0x8a6a4a, 0,.16,0, .16,.13,.20));
+    g.add(sph(0x6e5238, 0,.17,-.20, .09,.04,.16));                        // tail
+    g.add(sph(0x9a7a58, 0,.30,.13, .10,.09,.10));                         // head, dipped to peck
+    g.add(conePart(0x4a3826, 0,.28,.26, .03,.10, Math.PI/2));
+    g.add(sph(0x201a12, -.05,.33,.17, .018)); g.add(sph(0x201a12, .05,.33,.17, .018));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
+  }
+  function makeThreshingFloor(x,z){
+    // Ruth 3 — the stone threshing floor: worn paving circle, kerb stones, a heaped grain
+    // pile, a winnowing fork leaning on it, and an amphora waiting to be filled
+    const g=new THREE.Group();
+    const fl=part('cylinder',0xcbb894, 0,.05,0, 7.0,.1,7.0); fl.castShadow=false; g.add(fl);
+    for(let i=0;i<10;i++){ const a=i/10*TAU;
+      const kb=sph([0xb3a37e,0xa89877][i%2], Math.cos(a)*3.3,.16,Math.sin(a)*3.3, .34,.16,.26);
+      kb.rotation.y=-a; kb.castShadow=false; g.add(kb); }
+    g.add(conePart(0xe0bd66, .9,.55,-.6, 1.05,1.1));                      // the heaped grain...
+    g.add(sph(0xd6b25e, .9,.06,-.6, 1.25,.09,1.25));                      // ...spilling at its base
+    const fork=pivotAt(-1.6,0,1.1); fork.rotation.z=.5;                   // winnowing fork leaning into the heap
+    fork.add(part('cylinder',0x8a6a42, 0,1.15,0, .07,2.3,.07));
+    [-.16,0,.16].forEach(px=>fork.add(part('cylinder',0x9c7a4e, px,2.42,0, .045,.55,.045, 0,0,px*.9)));
+    fork.traverse(o=>{ if(o.isMesh) o.castShadow=false; }); g.add(fork);
+    g.add(sph(0xb5714a, 1.9,.42,1.5, .30,.42,.30));                       // clay amphora
+    g.add(part('cylinder',0xa5643f, 1.9,.92,1.5, .26,.2,.26));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function wheatScenery(){
+    const [fx,fz]=wheatField();
+    makeThreshingFloor(fx,fz);
+    makeSheaf(fx+3.9, fz+1.2); makeSheaf(fx-3.4, fz-2.4);                 // fresh-bound sheaves by the floor
+    for(let i=0;i<5;i++){ const [x,z]=randPos(2.5); if(Math.hypot(x,z)>5 && Math.hypot(x-fx,z-fz)>5.5) makeSheaf(x,z); }
+    for(let i=0;i<2;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>8) makeJarCluster(x,z); }
+    for(let i=0;i<3;i++) makeSparrow(fx+(Math.random()-.5)*5.5, fz+(Math.random()-.5)*5.5);
+    for(let i=0;i<3;i++){ const a=Math.random()*TAU, r=WORLD_R-3.5; makeTree(Math.cos(a)*r, Math.sin(a)*r); }
+    for(let i=0;i<3;i++){ const [x,z]=randPos(2); makeRock(x,z,.4+Math.random()*.4); }
+    for(let i=0;i<6;i++){ const [x,z]=randPos(1.5); makeFlower(x,z); }    // poppies between the drifts
+  }
+
   // ---- Jerusalem stone-street decor (the 'city' biome) ----
   const PLASTERS=[0xd9cdb4,0xcfc0a4,0xc8b795,0xdccfb0], AWNINGS=[0xb54848,0x4a7fb5,0x7a9a4f,0xb5892b];
   function makeHouse(x,z,ry){
@@ -1038,6 +1202,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   })();
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
+    wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
     const env = currentEnv || {}, d = env.decor || 'forest';
     ambient.visible = !env.interior;       // no butterflies drifting through the temple
     const nT=Math.round(WORLD_R*0.55), nR=Math.round(WORLD_R*0.4), nF=Math.round(WORLD_R*0.8);
@@ -1055,6 +1220,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       riverScenery();
     } else if(d==='mountain'){
       mountainScenery();
+    } else if(d==='wheat'){
+      wheatScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1946,7 +2113,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'joseph', name:'Joseph Stores the Grain', emoji:'🏺', type:'collect', base:9, item:'grain',
       goal:'Help wise Joseph store up grain in Egypt before the famine comes!',
       verse:'“Joseph stored up huge quantities of grain, like the sand of the sea.” — Genesis 41:49',
-      env:{ ground:FIELD, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+      env:{ ground:FIELD, water:null, sky:0xf4dcb0, fogFar:88, decor:'wheat' } },
     { id:'sheep', name:'The Lost Sheep', emoji:'🐑', type:'find', base:1,
       goal:'One little lamb is lost. Explore and find it!',
       verse:'“Rejoice with me; I have found my lost sheep.” — Luke 15:6',
@@ -1994,7 +2161,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'ruth', name:'Ruth Gleans the Grain', emoji:'🌾', type:'collect', base:8, item:'grain',
       goal:'Be kind and hard-working like Ruth — glean the golden grain!',
       verse:'“May you be richly rewarded by the Lord… under whose wings you have come to take refuge.” — Ruth 2:12',
-      env:{ ground:FIELD, water:null, sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:FIELD, water:null, sky:0xf7cfa4, decor:'wheat' } },
     { id:'solomon', name:"Solomon's Golden Temple", emoji:'🏛️', type:'collect', base:9, item:'gold',
       goal:'Help wise King Solomon gather gold to make God’s temple shine!',
       verse:'“Solomon covered the inside of the temple with pure gold.” — 1 Kings 6:21',
@@ -2046,7 +2213,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'sower', name:'The Sower & the Seeds', emoji:'🌱', type:'collect', base:9, item:'grain',
       goal:'Jesus told of seeds that grew big and tall on good soil! Gather the good harvest!',
       verse:'“Still other seed fell on good soil, where it produced a crop—a hundred, sixty or thirty times what was sown.” — Matthew 13:8',
-      env:{ ground:FIELD, water:null, sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:FIELD, water:null, sky:0x9fd8ff, decor:'wheat' } },
     { id:'pearl', name:'The Pearl of Great Price', emoji:'🦪', type:'collect', base:8, item:'pearl',
       goal:'The kingdom of heaven is like a precious treasure! Find the fine pearls along the shore!',
       verse:'“The kingdom of heaven is like a merchant looking for fine pearls. When he found one of great value, he… sold everything he had and bought it.” — Matthew 13:45-46',
@@ -2845,6 +3012,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // gentle wind sway on trees/plants (pivots from their base at y=0 — play area stays flat)
     for(let i=0;i<swayers.length;i++){ const s=swayers[i], a=s.userData;
       const w = Math.sin(T*1.1 + a.phase)*a.sway; s.rotation.z = w; s.rotation.x = w*0.4; }
+    updateWheat(dt, T);   // the standing crop: wind swell + parting around player and pickups
+
     // water animates in its shader — just advance the ripple/foam clock (no per-vertex CPU work)
     if(waterUni) waterUni.uTime.value = T;
     // drifting, wing-flapping butterflies
