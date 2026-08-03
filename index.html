@@ -266,10 +266,36 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const halo=new THREE.Mesh(new THREE.SphereGeometry(4.7,18,14),
       new THREE.MeshBasicMaterial({color:0xdfe6ff, fog:false, transparent:true, opacity:0.22}));
     halo.position.copy(moon.position); starField.add(halo); })();
+  // storm rain — a sheet of slanted streaks that follows the player (visible only in storm biomes).
+  // One persistent LineSegments like starField: never rebuilt per mission, animated in frame()
+  const rainField=(function(){ const N=260, p=new Float32Array(N*6);
+    for(let i=0;i<N;i++){ const x=(Math.random()*2-1)*27, z=(Math.random()*2-1)*27, y=Math.random()*24;
+      p[i*6]=x; p[i*6+1]=y; p[i*6+2]=z; p[i*6+3]=x+0.55; p[i*6+4]=y-1.6; p[i*6+5]=z+0.16; }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p,3));
+    const m=new THREE.LineSegments(g, new THREE.LineBasicMaterial({color:0xb9cad8, transparent:true, opacity:0.35}));
+    m.frustumCulled=false; m.visible=false; scene.add(m); return m; })();
+  // squall state (driven by frame(): lightning flashes, and the sea easing calm near Jesus)
+  let stormLevel=1, stormFlash=0, stormNextT=3, stormSky=null, stormFog=null;
+  const STORM_FLASH_SKY=new THREE.Color(0xe3ecf4), STORM_CALM_SKY=new THREE.Color(0x93b9d2),
+        STORM_CALM_SUN=new THREE.Color(0xffe9c2), STORM_KEY_SUN=new THREE.Color(0xb9c6d2);
   let currentEnv = null;
   function setSky(hex, near, far, night){
     const sky = new THREE.Color(hex);
     scene.background = sky;
+    rainField.visible = !!(currentEnv && currentEnv.storm);
+    if(currentEnv && currentEnv.storm){
+      // squall light: one cold gray key struggling through the cloud deck, everything desaturated —
+      // the frame() storm code flickers lightning around these base values and warms them as it calms
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x38424c), 0.42), near||34, far||76);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 0.6; sun.color.copy(STORM_KEY_SUN);
+      sun.position.set(-18, 42, -12);
+      hemi.color.set(0x5f6d7a); hemi.groundColor.set(0x333b42); hemi.intensity = 0.78;
+      ambLight.color.set(0x93a5b4); ambLight.intensity = 0.22;
+      stormSky = sky.clone(); stormFog = scene.fog.color.clone();
+      stormLevel = 1; stormFlash = 0; stormNextT = 2.5 + Math.random()*3;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='heaven'){
       // the New Jerusalem needs no sun (Rev 21:23): a star-strewn violet dusk where the
       // warm key light pours OUT of the city itself, up-screen, backlighting the pilgrim's walk
@@ -517,6 +543,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       const wCol = new THREE.Color(wc);
       const uni = {
         uTime:   { value: 0 },
+        uStorm:  { value: env.storm ? 1 : 0 },   // 0 calm → 1 full squall; frame() eases it live ("Quiet! Be still!")
         uMode:   { value: wmode==='sea' ? 1 : (wmode==='stream' ? 2 : 0) },
         uShore:  { value: wmode==='sea'    ? new THREE.Vector4(0,0,seaZ,0)
                         : wmode==='stream' ? new THREE.Vector4(0,0,2.12,0)
@@ -526,7 +553,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       };
       // same signed shoreline distance as inWater()/the ground tint, in GLSL (shared by both stages)
       const WGLSL = [
-        'uniform float uTime; uniform float uMode; uniform vec4 uShore;',
+        'uniform float uTime; uniform float uMode; uniform vec4 uShore; uniform float uStorm;',
         'varying vec3 vWPos;',
         'float shoreSd(vec2 p){',
         '  if(uMode < 0.5) return uShore.z - length(p - uShore.xy);',
@@ -544,7 +571,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           'vec4 bqW = modelMatrix * vec4( position, 1.0 );',
           'vWPos = bqW.xyz;',
           // gentle swell, damped flat near the shoreline so the waterline never gaps open
-          'transformed.y += ( sin(bqW.x*0.5 + uTime*1.35) + cos(bqW.z*0.45 + uTime*1.05) ) * 0.06 * smoothstep(0.5, 4.0, shoreSd(bqW.xz));'
+          'float bqSdV = shoreSd(bqW.xz);',
+          'transformed.y += ( sin(bqW.x*0.5 + uTime*1.35) + cos(bqW.z*0.45 + uTime*1.05) ) * (0.06 + uStorm*0.10) * smoothstep(0.5, 4.0, bqSdV);',
+          // storm only: long heavy rollers marching shoreward + short wind chop riding on top
+          'transformed.y += uStorm * sin(bqW.x*0.21 + bqW.z*0.30 + uTime*1.6) * 0.55 * smoothstep(1.5, 8.0, bqSdV);',
+          'transformed.y += uStorm * sin(bqW.x*0.9 - bqW.z*0.7 + uTime*3.1) * 0.10 * smoothstep(1.0, 5.0, bqSdV);'
         ].join('\n'));
         sh.fragmentShader = WGLSL + 'uniform vec3 uShallow; uniform vec3 uDeep;\n' + sh.fragmentShader
           .replace('vec4 diffuseColor = vec4( diffuse, opacity );', [
@@ -557,7 +588,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
             // a second lapping foam line that slides in and out from the beach
             'float bqLap = 1.1 + 0.7*sin(uTime*0.85 + vWPos.x*0.23 + vWPos.z*0.19);',
             'bqFoam += (1.0 - smoothstep(0.0, 0.30, abs(bqSd - bqLap + bqFr*0.18))) * 0.7;',
-            'bqFoam = clamp(bqFoam, 0.0, 1.0) * (0.78 + 0.22*sin(uTime*2.3 + vWPos.x*3.1 + vWPos.z*2.7));',
+            // storm whitecaps: foam streaking off the crests of the big rollers, torn up by the wind
+            'float bqCr = sin(vWPos.x*0.21 + vWPos.z*0.30 + uTime*1.6);',
+            'float bqCap = uStorm * smoothstep(0.45, 1.0, bqCr) * (0.5 + 0.5*sin(vWPos.x*2.2 + vWPos.z*1.8 + uTime*2.6)) * smoothstep(1.0, 6.0, bqSd);',
+            'bqFoam = clamp(bqFoam + bqCap*0.85, 0.0, 1.0) * (0.78 + 0.22*sin(uTime*2.3 + vWPos.x*3.1 + vWPos.z*2.7));',
             'bqCol = mix(bqCol, vec3(0.97, 0.99, 1.0), bqFoam*0.9);',
             'float bqA = mix(0.52, 0.88, bqDeep);',
             'bqA = max(bqA, bqFoam*0.95);',
@@ -587,7 +621,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         wm = new THREE.Mesh(wGeo, water); wm.position.set(pondX, WY, pondZ);
       } else if(wmode==='sea'){
         const len = WORLD_R*2.4 + 1.6;    // starts 1.6 beach-side of the waterline so the edge can fade out
-        wGeo = new THREE.PlaneGeometry(WORLD_R*4, len, 36, 24); wGeo.rotateX(-Math.PI/2);
+        // storm seas carry real vertex swell, so they need a finer grid to heave smoothly
+        const sgx = env.storm?80:36, sgz = env.storm?54:24;
+        wGeo = new THREE.PlaneGeometry(WORLD_R*4, len, sgx, sgz); wGeo.rotateX(-Math.PI/2);
         wm = new THREE.Mesh(wGeo, water); wm.position.set(0, WY, seaZ + len/2 - 1.6);
       } else {
         // diagonal band along the line x+z=0; wider than the visual stream so both banks fade out.
@@ -1394,6 +1430,37 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambient.add(g); butterflies.push(g);
     }
   })();
+  // ---- Storm-lashed shore (the 'storm' biome — Mark 4, Acts 27): a dark squall over heaving
+  //      water, palms bent hard in the gale, wreck debris strewn on the sand, and a ragged
+  //      cloud deck scudding along the horizon. Rain/lightning/thunder live in frame(). ----
+  function stormScenery(){
+    for(let i=0;i<Math.round(WORLD_R*0.3);i++){ const [x,z]=randPos(3);
+      if(Math.hypot(x,z)>6 && !inWater(x,z)){ const p=makePalm(x,z);
+        p.userData.sway=0.10+Math.random()*0.05;             // whipping, not swaying
+        p.userData.lean=0.14+Math.random()*0.08; } }         // permanently bent away from the sea wind
+    for(let i=0;i<Math.round(WORLD_R*0.35);i++){ const [x,z]=randPos(2); makeRock(x,z,0.6+Math.random()); }
+    for(let i=0;i<9;i++){ const [x,z]=randPos(2);            // driftwood logs thrown up the beach
+      const dw=part('capsule', i%2?0x6b4a2c:0x59391f, 0,.12,0, .16, .7+Math.random()*.6, .16, 0,0,Math.PI/2);
+      dw.rotation.y=Math.random()*TAU; dw.position.set(x,0,z); dw.castShadow=false; decor.add(dw); }
+    for(let i=0;i<5;i++){ const [x,z]=randPos(3);            // cargo washed ashore — barrels and burst crates
+      const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=Math.random()*TAU;
+      if(i%2){ g.add(part('cylinder',0x8a5f38, 0,.20,0, .38,.95,.38, Math.PI/2,0,0));
+               g.add(part('cylinder',0x5f3f22, 0,.20,.30, .40,.06,.40, Math.PI/2,0,0));
+               g.add(part('cylinder',0x5f3f22, 0,.20,-.30, .40,.06,.40, Math.PI/2,0,0)); }
+      else { const c=box(.85,.85,.85,0x9c7a48, 0,.30,0); c.rotation.z=.32; c.rotation.x=.1; g.add(c);
+             g.add(box(.9,.08,.9,0x6b4a2c, 0,.62,.1)); }
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; }); decor.add(g); }
+    // low ragged storm scud on the horizon ring — dark shapes half-swallowed by the murk
+    const cm=new THREE.MeshLambertMaterial({color:0x3c454f});
+    for(let i=0;i<9;i++){ const a=i/9*TAU+Math.random()*0.5, rr=WORLD_R*1.15+Math.random()*(WORLD_R*0.7);
+      const cl=new THREE.Group(); cl.position.set(Math.cos(a)*rr, 21+Math.random()*6, Math.sin(a)*rr);
+      for(let k=0;k<3;k++){ const s=new THREE.Mesh(ugeo('sphere'), cm);
+        s.scale.set(5.5+Math.random()*4.5, 1.2+Math.random()*0.9, 3+Math.random()*2.5);
+        s.position.set((k-1)*4.4+(Math.random()-.5)*2, (Math.random()-.5)*0.9, (Math.random()-.5)*2);
+        s.castShadow=false; cl.add(s); }
+      decor.add(cl); }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -1420,6 +1487,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       denScenery();
     } else if(d==='heaven'){
       heavenScenery();
+    } else if(d==='storm'){
+      stormScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2170,6 +2239,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(vol||.45,t+.03); g.gain.exponentialRampToValueAtTime(.001,t+dur);
     if(vib){ const lfo=audioCtx.createOscillator(), lg=audioCtx.createGain(); lfo.frequency.value=vib; lg.gain.value=f0*0.04; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t+dur); }
     o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.04); }
+  function sfxThunder(){ if(!audioCtx||!sfxOn) return;   // filtered-noise rumble that rolls in just after the flash
+    const t=audioCtx.currentTime+0.14, dur=2.4;
+    const buf=audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate*dur), audioCtx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length, 1.5);
+    const src=audioCtx.createBufferSource(); src.buffer=buf;
+    const f=audioCtx.createBiquadFilter(); f.type='lowpass'; f.Q.value=0.8;
+    f.frequency.setValueAtTime(360,t); f.frequency.exponentialRampToValueAtTime(65,t+dur);
+    const g=audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.55,t+0.08); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t+dur); }
   function sfxAnimal(type){ initAudio(); if(!audioCtx) return;
     switch(type){
       case 'sheep':    slide(340,300,0,.24,'sawtooth',.4,14); slide(320,250,.22,.3,'sawtooth',.4,16); break;   // baa-aa
@@ -2302,6 +2381,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
   const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
   const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
+  const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2422,7 +2502,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'storm', name:'Jesus Calms the Storm', emoji:'⛵', type:'reach',
       goal:'The wind and waves obey Jesus! Walk out to the boat where He is!',
       verse:'“He got up, rebuked the wind and said to the waves, ‘Quiet! Be still!’ Then the wind died down and it was completely calm.” — Mark 4:39',
-      env:{ ground:SAND, water:'sea', sky:0x8fa8bd, fogFar:86, decor:'beach' } },
+      env:{ ground:WETSAND, water:'sea', waterColor:0x2a4356, sky:0x5b6874, fogNear:34, fogFar:76, decor:'storm', storm:true } },
     { id:'sower', name:'The Sower & the Seeds', emoji:'🌱', type:'collect', base:9, item:'grain',
       goal:'Jesus told of seeds that grew big and tall on good soil! Gather the good harvest!',
       verse:'“Still other seed fell on good soil, where it produced a crop—a hundred, sixty or thirty times what was sown.” — Matthew 13:8',
@@ -2494,7 +2574,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'shipwreck', name:'Paul’s Shipwreck', emoji:'⚓', type:'collect', base:9, item:'plank',
       goal:'The ship broke apart in the storm, but God kept every single person safe! Gather the floating planks so everyone can reach the shore!',
       verse:'“The rest were to get there on planks or on other pieces of the ship. In this way everyone reached land safely.” — Acts 27:44',
-      env:{ ground:SAND, water:'sea', sky:0x8fa8bd, fogFar:86, decor:'beach' } },
+      env:{ ground:WETSAND, water:'sea', waterColor:0x2c4150, sky:0x56636f, fogNear:34, fogFar:76, decor:'storm', storm:true } },
     { id:'fruit', name:'Fruit of the Spirit', emoji:'🍎', type:'collect', base:9, item:'fruit',
       goal:'God’s Spirit grows good things in you — love, joy and peace! Gather the sweet orchard fruit!',
       verse:'“But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.” — Galatians 5:22-23',
@@ -3227,11 +3307,47 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     animateRigs(dt, T);   // every person & animal: breath, blinks, glances, walks, grazing, tails
     // gentle wind sway on trees/plants (pivots from their base at y=0 — play area stays flat)
     for(let i=0;i<swayers.length;i++){ const s=swayers[i], a=s.userData;
-      const w = Math.sin(T*1.1 + a.phase)*a.sway; s.rotation.z = w; s.rotation.x = w*0.4; }
+      const w = Math.sin(T*1.1 + a.phase)*a.sway; s.rotation.z = w + (a.lean||0); s.rotation.x = w*0.4; }
     updateWheat(dt, T);   // the standing crop: wind swell + parting around player and pickups
 
     // water animates in its shader — just advance the ripple/foam clock (no per-vertex CPU work)
     if(waterUni) waterUni.uTime.value = T;
+    // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
+    if(currentEnv && currentEnv.storm && player){
+      // "Quiet! Be still!" — nearing Jesus in the boat (or winning) eases the whole squall out:
+      // the rollers flatten, the rain thins, the sky warms and the sun breaks through
+      let calm = 0;
+      if(won) calm = 1;
+      else if(mission && mission.id==='storm' && missionCtx && missionCtx.goalObj &&
+              player.position.distanceTo(missionCtx.goalObj.position) < 11) calm = 1;
+      stormLevel += ((1-calm) - stormLevel) * Math.min(1, dt*0.55);
+      if(waterUni && waterUni.uStorm) waterUni.uStorm.value = stormLevel;
+      rainField.visible = stormLevel > 0.04;
+      if(rainField.visible){
+        rainField.material.opacity = 0.35*stormLevel;
+        rainField.position.set(player.position.x, 0, player.position.z);   // the sheet travels with the kid
+        const rp = rainField.geometry.attributes.position;
+        for(let i=0;i<rp.count;i+=2){ let y = rp.getY(i) - dt*26; if(y < 0.3) y += 24;
+          rp.setY(i, y); rp.setY(i+1, y-1.6); }
+        rp.needsUpdate = true;
+      }
+      stormNextT -= dt;
+      if(stormNextT <= 0){ if(stormLevel > 0.5){ stormFlash = 1; sfxThunder(); } stormNextT = 4.5 + Math.random()*7; }
+      if(stormFlash > 0) stormFlash = Math.max(0, stormFlash - dt*2.1);
+      const fl = stormFlash*stormFlash * (0.55 + 0.45*Math.sin(stormFlash*34));   // double-flicker strike
+      sun.intensity = 0.6 + fl*0.9 + (1-stormLevel)*0.55;
+      sun.color.copy(STORM_KEY_SUN).lerp(STORM_CALM_SUN, 1-stormLevel);
+      ambLight.intensity = 0.22 + fl*1.15;
+      if(stormSky){ scene.background.copy(stormSky).lerp(STORM_CALM_SKY, (1-stormLevel)*0.6).lerp(STORM_FLASH_SKY, Math.min(1, fl*0.7));
+        if(scene.fog) scene.fog.color.copy(stormFog).lerp(STORM_CALM_SKY, (1-stormLevel)*0.45); }
+      // the little boat rides the swell — pitching hard in the gale, rocking gently once it's calm
+      if(mission && mission.id==='storm' && missionCtx && missionCtx.goalObj){
+        const b = missionCtx.goalObj, sw = 0.15 + 0.85*stormLevel;
+        b.position.y = Math.sin(T*0.85)*0.24*sw;
+        b.rotation.z = Math.sin(T*0.85+0.7)*0.11*sw;
+        b.rotation.x = Math.sin(T*0.62)*0.06*sw;
+      }
+    }
     // drifting, wing-flapping butterflies
     const lim = WORLD_R-1;
     for(let i=0;i<butterflies.length;i++){ const bf=butterflies[i], u=bf.userData;
