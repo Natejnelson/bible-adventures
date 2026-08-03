@@ -271,6 +271,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const sky = new THREE.Color(hex);
     scene.background = sky;
     if(currentEnv && currentEnv.interior){
+      if(currentEnv.decor==='den'){
+        // underground: one pale steep key light — day falling through the mouth of the den —
+        // over cool stone ambience, with a warm undertone from the wall torches
+        scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x040507), 0.45), near||22, far||58);
+        starField.visible = false; clouds.visible = false;
+        sun.intensity = 0.62; sun.color.set(0xcfdcf2);
+        sun.position.set(5, 44, -9);
+        hemi.color.set(0x6a6158); hemi.groundColor.set(0x1c1814); hemi.intensity = 0.6;
+        ambLight.color.set(0xffc088); ambLight.intensity = 0.36;
+        return;
+      }
       // indoors: no sky, no clouds — warm cedar-dark haze, and the "sun" becomes a high
       // clerestory-window beam raking across the hall so the columns throw long shadows
       scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x140c04), 0.30), near||30, far||72);
@@ -1186,6 +1197,89 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const warm=new THREE.PointLight(0xffcf8e, 0.85, 34);                         // soft golden falloff at the heart of the hall
     warm.position.set(0, 8, 0); decor.add(warm);
   }
+  // ---- Lions'-den / dungeon cavern (the 'den' biome — Daniel 6, Acts 16): rough rock
+  //      pressing close on every side, stalactites overhead, wall torches pooling warm
+  //      firelight, and one pale shaft of daylight from the sealed mouth of the den above ----
+  const DEN_ROCK = [0x5c534a, 0x514941, 0x665c52, 0x483f38];
+  const dayShaftM = new THREE.MeshBasicMaterial({color:0xdfe8ff, transparent:true, opacity:0.13,
+    blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const dayPoolM = new THREE.MeshBasicMaterial({color:0xdfe8ff, transparent:true, opacity:0.15,
+    blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  function denTorch(x,z,ry){
+    const g=new THREE.Group();
+    const stave=part('cylinder',0x6b4423, 0,1.9,.30, .15,1.7,.15, .38,0,0); g.add(stave);   // stave leaning off the rock
+    g.add(part('torus',0x3c342c, 0,1.42,.12, .30,.30,.30, .38,0,0));                        // iron wall bracket
+    const wrap=part('cylinder',0x4a3828, 0,2.62,.57, .21,.34,.21, .38,0,0); g.add(wrap);    // pitch-soaked head
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffb347}));
+    fl.position.set(0,3.16,.76); fl.scale.set(.52,1.15,.52); g.add(fl);                     // flame
+    const core=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe9a8}));
+    core.position.set(0,3.06,.76); core.scale.set(.28,.68,.28); g.add(core);                // hot core
+    const gl=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffd9a0, transparent:true, opacity:.34}));
+    gl.position.set(0,3.1,.76); gl.scale.setScalar(1.7); g.add(gl);                         // soft halo
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.02);                                // the sway loop = firelight flicker
+    decor.add(g);
+    const pool=new THREE.Mesh(ugeo('sphere'), poolM);                                       // warm patch of torchlight on the floor
+    pool.position.set(x+Math.sin(ry)*2.4, .06, z+Math.cos(ry)*2.4); pool.scale.set(7.5,.02,6.0); decor.add(pool);
+    return g;
+  }
+  function denScenery(){
+    const B=WORLD_R+2.8;
+    for(let side=0;side<4;side++){                       // sealed rock box just past the walk clamp
+      const horiz=(side<2), off=(side%2?B:-B);
+      const wall=box(horiz?B*2+8:2.2, 13, horiz?2.2:B*2+8, 0x3a332c, horiz?0:off, 6.5, horiz?off:0);
+      wall.castShadow=false; decor.add(wall);
+    }
+    // rough boulder facing so the flat walls read as living rock, not masonry
+    const B2=WORLD_R+0.9, N=7;
+    for(let side=0;side<4;side++){
+      for(let i=0;i<N;i++){
+        const t=-B2+(i+0.5)*(2*B2)/N + (Math.random()-.5)*1.6;
+        const horiz=(side<2), off=(side%2?B2:-B2);
+        const m=new THREE.Mesh(ugeo('boulder'), flatMat(DEN_ROCK[(i+side)%4]));
+        m.scale.set(4.2+Math.random()*1.6, 5.5+Math.random()*4.5, 4.2+Math.random()*1.6);
+        m.rotation.set((Math.random()-.5)*.3, Math.random()*TAU, (Math.random()-.5)*.3);
+        m.position.set(horiz?t:off, 1.6+Math.random()*1.2, horiz?off:t);
+        m.castShadow=false; m.receiveShadow=true; decor.add(m);
+        if(i%2===0){                                     // stalactite hanging out of the dark above
+          const st=new THREE.Mesh(ugeo('crag'), flatMat(DEN_ROCK[(i+side+2)%4]));
+          st.scale.set(.9+Math.random()*.9, 2.6+Math.random()*2.2, .9+Math.random()*.9);
+          st.rotation.set(Math.PI,Math.random()*TAU,0);
+          st.position.set((horiz?t:off)*0.96, 11.6-Math.random()*1.8, (horiz?off:t)*0.96);
+          st.castShadow=false; decor.add(st);
+        }
+      }
+    }
+    // stalagmites + rubble creeping in from the floor edges (kept clear of mid-floor play)
+    for(let i=0;i<10;i++){
+      const a=Math.random()*TAU, r=WORLD_R-(1.2+Math.random()*2.6), x=Math.cos(a)*r, z=Math.sin(a)*r;
+      const sg=new THREE.Mesh(ugeo('crag'), flatMat(DEN_ROCK[i%4]));
+      sg.scale.set(.7+Math.random()*.7, 1.4+Math.random()*1.6, .7+Math.random()*.7);
+      sg.rotation.y=Math.random()*TAU; sg.position.set(x,0,z); sg.castShadow=false; decor.add(sg);
+    }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(4); if(Math.hypot(x,z)>7) makeRock(x,z,0.55+Math.random()*0.6); }
+    for(let i=0;i<7;i++){                                // strewn straw bedding, warm against the stone
+      const [x,z]=randPos(4); const s=sph(0x9a8352, x,.06,z, 1.1+Math.random()*.8, .07, .8+Math.random()*.6);
+      s.rotation.y=Math.random()*TAU; s.castShadow=false; decor.add(s);
+    }
+    // the mouth of the den: one pale shaft of day falling from high above onto the cave heart
+    const beam=new THREE.Mesh(ugeo('cone'), dayShaftM);
+    beam.position.set(0,6.8,0); beam.scale.set(7.6,13.6,7.6); decor.add(beam);
+    const dpool=new THREE.Mesh(ugeo('sphere'), dayPoolM);
+    dpool.position.set(0,.07,0); dpool.scale.set(8.6,.02,7.0); decor.add(dpool);
+    const motes=new THREE.Group();                       // dust drifting down through the light
+    for(let m=0;m<6;m++){ const d=new THREE.Mesh(ugeo('sphere'), moteM);
+      d.position.set((Math.random()-.5)*4.5, 1+Math.random()*8, (Math.random()-.5)*4.5);
+      d.scale.setScalar(.05+Math.random()*.05); motes.add(d); }
+    windify(motes, 0.02); decor.add(motes);
+    // torches on facing walls (visual flames everywhere; only TWO real lights, on opposite sides)
+    const TR=WORLD_R-2.2;
+    [[-TR*0.55,-TR,0],[TR*0.55,-TR,0],[-TR,TR*0.5,Math.PI/2],[TR,-TR*0.5,-Math.PI/2],[-TR*0.4,TR,Math.PI],[TR*0.6,TR,Math.PI]]
+      .forEach(p=>denTorch(p[0],p[1],p[2]));
+    const warmA=new THREE.PointLight(0xffb066, 1.35, 34); warmA.position.set(-TR*0.55, 4.2, -TR+2); decor.add(warmA);
+    const warmB=new THREE.PointLight(0xffb066, 1.2, 34); warmB.position.set(TR-2, 4.2, -TR*0.5); decor.add(warmB);
+  }
+
   // a few drifting butterflies for a living, modern feel (persistent, never cleared)
   const butterflies = [];
   (function spawnButterflies(){
@@ -1222,6 +1316,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       mountainScenery();
     } else if(d==='wheat'){
       wheatScenery();
+    } else if(d==='den'){
+      denScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2089,6 +2185,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const MARBLE= [0xe7dab8,0xdccfa9,0xefe4c6,0xd2c39a];   // polished temple pavement, lamp-warmed
   const SEDGE = [0x6fb054,0x7cb95f,0x64a24a,0x94ad62];   // riverbank sedge-green fading into dry khaki
   const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
+  const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2201,7 +2298,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'daniel', name:'Daniel & the Lions', emoji:'🙏', type:'reach',
       goal:'God kept the lions gentle — walk safely to Daniel!',
       verse:'“My God sent his angel, and he shut the mouths of the lions.” — Daniel 6:22',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:CAVE, water:null, sky:0x0f0c0a, fogNear:24, fogFar:60, decor:'den', interior:true, night:true } },
     { id:'jonah', name:'Jonah & the Great Fish', emoji:'🐋', type:'reach',
       goal:'Walk along the shore to the great fish!',
       verse:'“The Lord provided a great fish to swallow Jonah.” — Jonah 1:17',
@@ -2277,7 +2374,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'prisonsong', name:'Paul & Silas Sing', emoji:'🎵', type:'collect', base:9, item:'note',
       goal:'At midnight Paul and Silas sang to God in prison — and the doors flew open! Gather their songs of praise!',
       verse:'“About midnight Paul and Silas were praying and singing hymns to God… At once all the prison doors flew open, and everyone’s chains came loose.” — Acts 16:25-26',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:CAVE, water:null, sky:0x0c0c12, fogNear:24, fogFar:60, decor:'den', interior:true, night:true } },
     { id:'shipwreck', name:'Paul’s Shipwreck', emoji:'⚓', type:'collect', base:9, item:'plank',
       goal:'The ship broke apart in the storm, but God kept every single person safe! Gather the floating planks so everyone can reach the shore!',
       verse:'“The rest were to get there on planks or on other pieces of the ship. In this way everyone reached land safely.” — Acts 27:44',
@@ -2403,18 +2500,21 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const el=makeNPC('elisha'); el.position.set(3,0,-3); el.rotation.y=2.6; props.add(el);
         const wd=makeNPC('widow'); wd.position.set(-3,0,3); wd.rotation.y=0.8; props.add(wd);
       }
-      if(mission.id==='prisonsong'){ // the Philippi prison at midnight — its doors flung open
-        const pa=Math.random()*TAU, pR=WORLD_R-5, px=Math.cos(pa)*pR, pz=Math.sin(pa)*pR;
+      if(mission.id==='prisonsong'){ // the inner cell at midnight (Acts 16:24) — its door flung open
+        const pa=Math.PI*(0.9+Math.random()*0.7), pR=WORLD_R-0.8, px=Math.cos(pa)*pR, pz=Math.sin(pa)*pR;
         const pr=new THREE.Group(); pr.position.set(px,0,pz); pr.rotation.y=Math.atan2(-px,-pz);
-        pr.add(box(8,3.4,4,0x8a8378, 0,1.7,0));                                  // stone prison walls
-        pr.add(box(8.5,.7,4.5,0x6e685e, 0,3.75,0));                              // heavy roof slab
-        pr.add(box(2.0,2.6,.45,0x2c2822, -2.2,1.3,1.95));                        // dark doorway...
-        const dr=box(1.9,2.5,.22,0x7a5230, -0.85,1.25,2.55); dr.rotation.y=1.1; pr.add(dr); // ...its door flung wide open
-        const gl=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffe9a8}));
-        gl.position.set(2.2,2.3,2.02); gl.scale.set(.55,.42,.14); gl.castShadow=false; pr.add(gl); // warm lamplight from a window
-        const ch=part('torus',0xb8b0a0, .2,.35,2.3, .22,.22,.26, Math.PI/2,0,0); ch.castShadow=false; pr.add(ch); // a loosed chain by the door
+        pr.add(box(3.6,4.6,.9,0x6e655a, 0,2.3,-.3));                             // dressed-stone door surround set in the rock
+        pr.add(box(2.0,3.4,.7,0x14110e, 0,1.7,-.15));                            // the way out, dark beyond...
+        const gl=new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({color:0xffe9b0}));
+        gl.scale.set(1.7,3.1,.1); gl.position.set(0,1.72,.32); gl.castShadow=false; pr.add(gl); // ...no — filled with light!
+        const dr=box(1.8,3.2,.22,0x7a5230, 1.55,1.6,1.25); dr.rotation.y=1.25; pr.add(dr);      // heavy door flung wide open
+        [[-.4,.9],[.35,1.6]].forEach(c=>{ const ch=part('torus',0xb8b0a0, c[0],.16,c[1], .30,.30,.34, Math.PI/2,0,0);
+          ch.castShadow=false; pr.add(ch); });                                   // chains, come loose on the floor
+        const stk=box(1.5,.34,.5,0x6b4423, -1.4,.17,2.2); stk.rotation.y=.5; stk.castShadow=false; pr.add(stk); // the stocks...
+        const stkT=box(1.5,.30,.5,0x7a5230, -1.15,.55,2.45); stkT.rotation.set(.9,.5,0); stkT.castShadow=false; pr.add(stkT); // ...sprung open
         props.add(pr);
-        const lt=new THREE.PointLight(0xffd9a0,.9,16); lt.position.set(px,3,pz); props.add(lt);
+        const jl=makeNPC('joshua'); jl.position.set(px*0.8,0,pz*0.8);            // the jailer, standing amazed
+        jl.rotation.y=Math.atan2(3-px*0.8,-3-pz*0.8); props.add(jl);
         const pl=makeNPC('paul'); pl.position.set(3,0,-3); pl.rotation.y=2.6; props.add(pl);
         const si=makeNPC('silas'); si.position.set(-3,0,-3); si.rotation.y=-2.6; props.add(si);
       }
