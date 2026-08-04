@@ -307,6 +307,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffe2b0); ambLight.intensity = 0.46;   // the city's own glow fills every shadowed face
       return;
     }
+    if(currentEnv && currentEnv.decor==='redsea'){
+      // the last watch of the night (Exodus 14:24-27): dawn is breaking over the far shore —
+      // one low golden sun dead ahead up the corridor (long shadows reach back toward Egypt),
+      // with a cool blue-green fill bounced off the two standing walls of water
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x86aab6), 0.38), near||42, far||98);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 1.2; sun.color.set(0xffd7a0);
+      sun.position.set(-30, 26, -30);
+      hemi.color.set(0x9cc6d6); hemi.groundColor.set(0x6d7a66); hemi.intensity = 0.8;
+      ambLight.color.set(0xffe2ba); ambLight.intensity = 0.36;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -461,6 +473,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           cA.lerp(cB.copy(cA).multiplyScalar(0.62), wet*wet*0.8);
           if(sd > 0) cA.lerp(bedC, Math.min(1, sd/7)*0.9);         // bed falls away under the shallows
         } }
+      if(env.decor==='redsea'){                                    // the parted-sea corridor, in ground tint:
+        const rp = Math.abs((x-z)*0.7071);                         // distance from the corridor centerline
+        if(rp > RS_W-0.7) cA.lerp(RS_BEDC, Math.min(1, (rp-(RS_W-0.7))/2.6)*0.92);        // drowned ground under the sea
+        else if(rp > RS_W-3.6){ const wet=(rp-(RS_W-3.6))/2.9;                            // still-wet band at the wall feet
+          cA.lerp(cB.copy(cA).multiplyScalar(0.58), wet*wet*0.85); }
+      }
       cols[v*3]=cA.r; cols[v*3+1]=cA.g; cols[v*3+2]=cA.b;
     }
     gGeo.setAttribute('color', new THREE.BufferAttribute(cols,3));
@@ -1461,6 +1479,158 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       decor.add(cl); }
   }
 
+  // ---- The parted Red Sea (the 'redsea' biome — Exodus 14): two towering walls of living
+  //      water flank a corridor of dry seabed running straight up the camera diagonal, so the
+  //      whole walk is staged between the walls with Moses framed dead-center on the far shore.
+  //      The held-back sea stands overhead on both sides, fish patrol inside the glassy walls,
+  //      and the seabed is strewn with what the sea left behind: shells, starfish, puddles. ----
+  const RS_A = Math.PI*1.25;               // corridor angle — the up-screen diagonal (must match startMission)
+  const RS_W = 6.4, RS_H = 10.5;           // corridor half-width and wall height
+  const RS_BEDC = new THREE.Color(0x17434e);              // dark drowned ground under the standing sea
+  const rsUni = { uTime:{value:0}, uH:{value:RS_H} };
+  // the wall of water: vertex-colored depth gradient (abyss blue at the foot, sunlit aqua at the
+  // crest), live ripple + heave in the vertex stage, streaming highlights / churning crest foam /
+  // glassy wet foot in the fragment stage. Same core-three onBeforeCompile approach as the sea.
+  const rsWallM = new THREE.MeshPhongMaterial({ vertexColors:true, transparent:true, opacity:0.9,
+    shininess:140, specular:0xcfeeff, emissive:0x123a48, side:THREE.DoubleSide });
+  rsWallM.onBeforeCompile = (sh)=>{
+    Object.assign(sh.uniforms, rsUni);
+    sh.vertexShader = 'uniform float uTime; uniform float uH; varying vec3 vRsP;\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', [
+        'vec3 transformed = vec3( position );',
+        'float rsY = position.y + uH*0.5;',
+        'float rsA = 0.10 + 0.24*smoothstep(0.15, 1.0, rsY/uH);',   // held firm at the base, alive at the crest
+        'transformed.z += sin(position.x*0.52 + rsY*0.8 + uTime*1.6)*rsA;',
+        'transformed.z += sin(position.x*1.7 - rsY*1.2 + uTime*2.8)*rsA*0.45;',
+        'transformed.y += sin(position.x*0.37 + uTime*1.15)*0.22*smoothstep(0.55, 1.0, rsY/uH);',
+        'vRsP = vec3(position.x, rsY, position.z);'
+      ].join('\n'));
+    sh.fragmentShader = 'uniform float uTime; uniform float uH; varying vec3 vRsP;\n' +
+      sh.fragmentShader.replace('#include <color_fragment>', [
+        '#include <color_fragment>',
+        'float rsT = clamp(vRsP.y/uH, 0.0, 1.0);',
+        // water streaming down the standing face — slow moving bands of light
+        'float rsSt = sin(vRsP.x*2.2 + vRsP.y*1.2 - uTime*2.5)*0.5 + sin(vRsP.x*0.7 - vRsP.y*2.7 + uTime*1.8)*0.5;',
+        'diffuseColor.rgb *= 0.90 + 0.10*rsSt;',
+        // foam boiling along the crest where the sea is being held back
+        'float rsCf = smoothstep(0.80, 0.97, rsT + 0.05*sin(vRsP.x*1.9 + uTime*2.3));',
+        'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.98, 1.0), rsCf*(0.72 + 0.28*sin(uTime*3.1 + vRsP.x*3.7)));',
+        // glassy wet sheen where the wall meets the dry ground
+        'float rsFt = 1.0 - smoothstep(0.0, 0.15, rsT);',
+        'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.90, 0.97, 1.0), rsFt*0.6);'
+      ].join('\n'));
+  };
+  const rsSeaM   = new THREE.MeshLambertMaterial({ color:0x0e455f, emissive:0x03181f });     // the held-back sea surface overhead
+  const rsFoamM  = new THREE.MeshLambertMaterial({ color:0xeef9ff, transparent:true, opacity:0.85 }); // churning crest foam
+  const rsSkirtM = new THREE.MeshLambertMaterial({ color:0xe8f6fb, transparent:true, opacity:0.42 });
+  const rsSprayM = new THREE.MeshLambertMaterial({ color:0xdcf2fa, transparent:true, opacity:0.4 });
+  const rsPuddleM= new THREE.MeshPhongMaterial({ color:0x5d98ac, transparent:true, opacity:0.35, shininess:220, specular:0xffffff });
+  const rsDawnM  = new THREE.MeshBasicMaterial({ color:0xffd9a0, transparent:true, opacity:0.5, fog:false });
+  const rsSunM   = new THREE.MeshBasicMaterial({ color:0xfff3d0, fog:false });
+  let rsFish = [], rsDisposables = [];
+  function rsWallGeo(len){
+    const H=RS_H, g=new THREE.PlaneGeometry(len, H, 72, 8);
+    const pos=g.attributes.position, cols=new Float32Array(pos.count*3);
+    const cDeep=new THREE.Color(0x14587a), cMid=new THREE.Color(0x2596b4),
+          cTop=new THREE.Color(0x6fd4e2), cFoam=new THREE.Color(0xe9f9ff), cc=new THREE.Color();
+    for(let i=0;i<pos.count;i++){
+      const px=pos.getX(i), py=pos.getY(i)+H/2, t=py/H;
+      // rest shape: a bulging glassy foot, sheer middle, and a crest curling over the path
+      pos.setZ(i, 0.6*Math.exp(-py/1.2) + 1.5*t*t*t + Math.sin(px*0.31 + py*0.55)*0.32*(0.3+t));
+      if(t<0.22) cc.copy(cDeep).lerp(cMid, t/0.22); else cc.copy(cMid).lerp(cTop, (t-0.22)/0.78);
+      if(t>0.88) cc.lerp(cFoam, (t-0.88)/0.12*0.85);
+      cols[i*3]=cc.r; cols[i*3+1]=cc.g; cols[i*3+2]=cc.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols,3));
+    g.computeVertexNormals();
+    return g;
+  }
+  function redseaScenery(){
+    rsFish = [];
+    rsDisposables.forEach(g=>g.dispose()); rsDisposables=[];   // walls are per-world-size custom geometry
+    const rs = new THREE.Group(); rs.rotation.y = Math.PI/4;   // local -Z maps onto the RS_A diagonal
+    decor.add(rs);
+    const L0 = WORLD_R+6, L1 = -(WORLD_R+16), len = L0-L1, zc=(L0+L1)/2;
+    [-1,1].forEach(side=>{
+      const g = rsWallGeo(len); rsDisposables.push(g);
+      const w = new THREE.Mesh(g, rsWallM);
+      w.rotation.y = -side*Math.PI/2;                          // face the corridor
+      w.position.set(side*RS_W, RS_H/2-0.15, zc);
+      w.castShadow=false; w.receiveShadow=false; w.renderOrder=2; rs.add(w);
+      // the whole sea, held back: an overhead deep-water deck running from the crest to the horizon
+      const st = new THREE.Mesh(boxGeo, rsSeaM);
+      st.scale.set(96, 0.5, len); st.position.set(side*(RS_W+48.4), RS_H-0.45, zc);
+      st.castShadow=false; st.receiveShadow=false; rs.add(st);
+      for(let i=0;i<7;i++){                                    // whitecaps drifting on the deck
+        const c=new THREE.Mesh(ugeo('sphere'), rsFoamM);
+        c.scale.set(2.2+Math.random()*2.6, 0.24, 1.1+Math.random()*1.2);
+        c.position.set(side*(RS_W+3+Math.random()*22), RS_H-0.12, L1+4+Math.random()*(len-8));
+        c.castShadow=false; rs.add(c);
+      }
+      for(let z=L1+2; z<L0-1; z+=1.9+Math.random()*0.8){       // a low frothy line churning along the crest
+        const f=new THREE.Mesh(ugeo('sphere'), rsFoamM);
+        f.scale.set(0.9+Math.random()*0.5, 0.26+Math.random()*0.14, 2.8+Math.random()*1.6);
+        f.position.set(side*(RS_W+0.4+(Math.random()-.5)*0.5), RS_H-0.22+Math.random()*0.2, z);
+        f.castShadow=false; rs.add(f);
+      }
+      for(let z=L1+2; z<L0-1; z+=1.3+Math.random()*0.5){       // foam fringe where the wall stands on dry ground
+        const f=new THREE.Mesh(ugeo('sphere'), rsSkirtM);
+        f.scale.set(0.8+Math.random()*0.4, 0.10+Math.random()*0.07, 2.0+Math.random()*1.2);
+        f.position.set(side*(RS_W-0.35+(Math.random()-.5)*0.6), 0.05, z);
+        f.castShadow=false; rs.add(f);
+      }
+      for(let k=0;k<5;k++){                                    // fish glimpsed drifting inside the wall
+        const fg=new THREE.Group(), c = k%2 ? 0x27596d : 0x1f4a5c;
+        fg.add(sph(c, 0,0,0, .20,.28,.62));
+        fg.add(part('cone', c, 0,0,.85, .7,.7,.25, -Math.PI/2));
+        fg.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=false; } });
+        const z0=L1+8+Math.random()*(len-16), y0=2+Math.random()*(RS_H-4.5);
+        fg.position.set(side*(RS_W+1.1+Math.random()*1.3), y0, z0);
+        fg.userData={ z0, y0, rg:3+Math.random()*4, sp:0.25+Math.random()*0.3, ph:Math.random()*TAU };
+        rs.add(fg); rsFish.push(fg);
+      }
+    });
+    // what the sea left on the corridor floor: shells, starfish, seaweed, puddles still draining
+    for(let i=0;i<14;i++){ const x=(Math.random()*2-1)*(RS_W-1.3), z=L1+8+Math.random()*(len-14);
+      const c=[0xe9dcc6,0xdcc4ae,0xe6cfd8][i%3];
+      const s = i%2 ? part('cone', c, x,.14,z, .3,.3,.3, Math.PI*0.45, Math.random()*TAU)
+                    : sph(c, x,.10,z, .16,.08,.14);
+      s.castShadow=false; rs.add(s); }
+    for(let i=0;i<5;i++){ const g=new THREE.Group();
+      g.position.set((Math.random()*2-1)*(RS_W-1.6), 0, L1+10+Math.random()*(len-18));
+      for(let a=0;a<5;a++){ const A=a/5*TAU, arm=sph(0xe0795a, Math.cos(A)*.24, .06, Math.sin(A)*.24, .17,.05,.08);
+        arm.rotation.y=-A; g.add(arm); }
+      g.add(sph(0xe8886a, 0,.08,0, .12,.07,.12));
+      g.rotation.y=Math.random()*TAU;
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; }); rs.add(g); }
+    for(let i=0;i<10;i++){ const g=new THREE.Group();
+      g.position.set((Math.random()*2-1)*(RS_W-1.4), 0, L1+8+Math.random()*(len-14));
+      for(let k=0;k<3;k++) g.add(part('cone', k%2?0x2f6b4f:0x3d7a58, (Math.random()-.5)*.5, .3+Math.random()*.25, (Math.random()-.5)*.5, .16,.6+Math.random()*.7,.16, (Math.random()-.5)*.5, Math.random()*TAU));
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      windify(g, 0.06); rs.add(g); }
+    for(let i=0;i<9;i++){ const p=new THREE.Mesh(ugeo('sphere'), rsPuddleM);
+      p.scale.set(2+Math.random()*1.8, .04, 1.3+Math.random()*1.2);
+      p.position.set((Math.random()*2-1)*(RS_W-1.8), .03, L1+8+Math.random()*(len-14));
+      p.rotation.y=Math.random()*TAU; p.castShadow=false; p.renderOrder=1; rs.add(p); }
+    // spray hanging in the air near the crests
+    const motes=new THREE.Group();
+    for(let m=0;m<10;m++){ const d=new THREE.Mesh(ugeo('sphere'), rsSprayM);
+      d.position.set((m%2?1:-1)*(RS_W-0.6-Math.random()*1.2), 6.5+Math.random()*(RS_H-5), L1+6+Math.random()*(len-12));
+      d.scale.setScalar(.09+Math.random()*.09); d.castShadow=false; motes.add(d); }
+    windify(motes, 0.05); rs.add(motes);
+    // the far shore: dune shoulders past the corridor mouth, under the sunrise itself
+    for(let i=0;i<4;i++){ const d=new THREE.Mesh(ugeo('sphere'), mat(0x9a8b6e));
+      d.scale.set(9+Math.random()*8, 2.2+Math.random()*1.6, 6+Math.random()*5);
+      d.position.set((i-1.5)*9+(Math.random()-.5)*4, -0.8, L1-6-Math.random()*6);
+      d.castShadow=false; rs.add(d); }
+    // dawn on the sea horizon: the glow and the sun's risen edge sit just ABOVE the held-back
+    // sea deck (y≈RS_H) so they clear its silhouette and read as sunrise over open water
+    const glow=new THREE.Mesh(ugeo('sphere'), rsDawnM);
+    glow.scale.set(40, 12, 2); glow.position.set(0, RS_H+1.4, -(WORLD_R+30)); glow.castShadow=false; rs.add(glow);
+    const disc=new THREE.Mesh(ugeo('sphere'), rsSunM);
+    disc.scale.set(5.5, 5.5, 1); disc.position.set(0, RS_H+0.4, -(WORLD_R+29)); disc.castShadow=false; rs.add(disc);
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -1489,6 +1659,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       heavenScenery();
     } else if(d==='storm'){
       stormScenery();
+    } else if(d==='redsea'){
+      redseaScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2382,6 +2554,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
   const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
   const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
+  const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2434,7 +2607,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'redsea', name:'Crossing the Red Sea', emoji:'🌊', type:'reach',
       goal:'God parted the sea! Walk the dry path to Moses on the far shore!',
       verse:'“The Israelites went through the sea on dry ground, with a wall of water on their right and on their left.” — Exodus 14:22',
-      env:{ ground:SAND, water:null, sky:0x9fd8ff, decor:'beach' } },
+      env:{ ground:SEABED, water:null, sky:0xf2c18b, fogNear:42, fogFar:98, decor:'redsea' } },
     { id:'manna', name:'Gather the Manna', emoji:'🍞', type:'collect', base:10, item:'manna',
       goal:'Collect the manna God sent from heaven!',
       verse:'“I will rain down bread from heaven for you.” — Exodus 16:4',
@@ -2797,18 +2970,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const nLions=4+Math.round(mult*2);
         for(let l=0;l<nLions;l++){ const lion=makeAnimal('lion'); const [x,z]=randPos(4); lion.position.set(x,0,z); lion.rotation.y=Math.random()*TAU; props.add(lion); }
         say('Don’t be afraid — the lions are gentle! Walk to Daniel. 🦁🙏',4200);
-      } else if(mission.id==='redsea'){ // the parted sea — a dry path between two walls of water
-        const mz=WORLD_R-4;
-        const moses=makeNPC('moses'); moses.position.set(0,0,mz); moses.rotation.y=Math.PI; props.add(moses); missionCtx.goalObj=moses;
-        const wallC=0x3f8fd0, foamC=0xbfe3ff, z0=4, z1=mz-4;
-        const n=Math.max(5, Math.round((z1-z0)/2.4));
-        for(let s=0;s<n;s++){ const wz=z0+s*(z1-z0)/(n-1), wob=Math.sin(s*1.7)*0.35;
-          [-1,1].forEach(side=>{
-            const w=part('capsule', wallC, side*(4.6+wob), 1.5, wz, 3.0+Math.sin(s*2.3+side)*.5, 2.1, 3.0);
-            w.castShadow=false; props.add(w);
-            if(s%2===0){ const f=sph(foamC, side*(4.6+wob), 3.4, wz, .8,.28,1.1); f.castShadow=false; props.add(f); }
-          });
-        }
+      } else if(mission.id==='redsea'){ // the parted sea — the redsea biome builds the walls; Moses
+        // waits dead-center at the corridor's far mouth, on the camera diagonal, against the dawn
+        const R=WORLD_R-4, gx=Math.cos(RS_A)*R, gz=Math.sin(RS_A)*R;
+        const moses=makeNPC('moses'); moses.position.set(gx,0,gz); moses.rotation.y=Math.atan2(-gx,-gz); props.add(moses); missionCtx.goalObj=moses;
         say('God made a dry path through the sea! Walk to Moses! 🌊',4200);
       } else if(mission.id==='walkwater'){ // Jesus stands on the water; walk across to Him
         const jx=(Math.random()*2-1)*(WORLD_R*0.4), jz=WORLD_R*0.62;
@@ -3312,6 +3477,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
     // water animates in its shader — just advance the ripple/foam clock (no per-vertex CPU work)
     if(waterUni) waterUni.uTime.value = T;
+    // ---- redsea biome: the standing walls ripple and churn; fish patrol inside the glass ----
+    if(currentEnv && currentEnv.decor==='redsea'){
+      rsUni.uTime.value = T;
+      for(const f of rsFish){ const d=f.userData, c=Math.cos(T*d.sp+d.ph);
+        f.position.z = d.z0 + Math.sin(T*d.sp+d.ph)*d.rg;
+        f.position.y = d.y0 + Math.sin(T*0.8+d.ph*3)*0.5;
+        const ty = c<0 ? 0 : Math.PI;                 // nose (at -z) leads the direction of travel
+        f.rotation.y += (ty-f.rotation.y)*Math.min(1, dt*5);
+        f.rotation.z = Math.sin(T*3.1+d.ph)*0.07;
+      }
+    }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
     if(currentEnv && currentEnv.storm && player){
       // "Quiet! Be still!" — nearing Jesus in the boat (or winning) eases the whole squall out:
