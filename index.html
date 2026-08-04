@@ -344,6 +344,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xff9d6a); ambLight.intensity = 0.20;
       return;
     }
+    if(currentEnv && currentEnv.decor==='village'){
+      // a working Galilee morning (Matthew 4:18): the sun still low OVER the water, so its
+      // glint-path runs up the sea toward the shore, long cool shadows reach inland from the
+      // boats and cottages, and a soft warm haze sits on the far hills — market light, not noon
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xf0dcba), 0.30), near||52, far||102);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.15; sun.color.set(0xffe2ac);
+      sun.position.set(12, 22, 36);
+      hemi.color.set(0xcfe6ef); hemi.groundColor.set(0x7d955c); hemi.intensity = 0.85;
+      ambLight.color.set(0xffeed2); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -492,6 +504,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       // darken very slightly toward the far edge for depth
       const edge = Math.min(1, Math.hypot(x,z)/R);
       cA.lerp(cB.copy(cA).multiplyScalar(0.72), edge*0.5);
+      if(env.decor==='village' && wmode){                          // grass gives way to a sandy strand before the waterline
+        const sdv = shoreSd(x,z);
+        if(sdv > -8){ const t = Math.min(1,(sdv+8)/8); cA.lerp(VL_SAND, t*t*0.85); }
+      }
       if(wmode){ const sd = shoreSd(x,z);
         if(sd > -3){
           const wet = Math.min(1, (sd+3)/3);                       // dry → dark damp band at the waterline
@@ -1907,6 +1923,186 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       a.rotation.y=Math.random()*TAU; a.castShadow=false; decor.add(a); }
   }
 
+  // ---- Galilee fishing-village decor (the 'village' biome — Matthew 4:18: "as Jesus was
+  //      walking beside the Sea of Galilee…"). Capernaum really was built of BLACK BASALT
+  //      fieldstone under pale thatch — a strong, true palette — and its whole shoreline was
+  //      working water: stone-footed jetty, moored and beached boats, nets drying everywhere,
+  //      gulls riding the morning air. One glance should say "people fish here". ----
+  const BASALT=[0x504e48,0x45443f,0x5a5850,0x3d3c38];    // Capernaum's black volcanic fieldstone
+  const THATCH=[0xcbb277,0xbfa668,0xd6c085];             // sun-bleached straw roofs
+  const VL_SAND=new THREE.Color(0xddc89e);               // the sandy strand between grass and water
+  let vlGulls=[], vlBob=[], vlSmoke=[], vlSmokeM=null, vlNetM=null, vlNetGeo=null, vlNetGeoS=null;
+  function netMat(){                                     // one shared canvas-woven net (never disposed — clearGroup doesn't dispose)
+    if(vlNetM) return vlNetM;
+    const c=document.createElement('canvas'); c.width=c.height=64;
+    const q=c.getContext('2d'); q.clearRect(0,0,64,64);
+    q.strokeStyle='rgba(112,86,50,0.95)'; q.lineWidth=2.4; q.beginPath();
+    for(let i=-64;i<=64;i+=8){ q.moveTo(i,0); q.lineTo(i+64,64); q.moveTo(i+64,0); q.lineTo(i,64); }
+    q.stroke();
+    const tx=new THREE.CanvasTexture(c); tx.wrapS=tx.wrapT=THREE.RepeatWrapping; tx.repeat.set(2.6,1.5);
+    vlNetM=new THREE.MeshLambertMaterial({map:tx, transparent:true, side:THREE.DoubleSide, depthWrite:false});
+    return vlNetM;
+  }
+  function netGeo(sm){ if(!vlNetGeo){ vlNetGeo=new THREE.PlaneGeometry(3.1,1.8,1,1); vlNetGeoS=new THREE.PlaneGeometry(2.0,1.2,1,1); } return sm?vlNetGeoS:vlNetGeo; }
+  function makeNetRack(x,z,ry){
+    // two weathered posts, a crossbar, and the day's nets hung out in loose folds
+    const g=new THREE.Group();
+    [-1.6,1.6].forEach(px=>g.add(part('cylinder',0x6b4a2b, px,1.02,0, .12,2.04,.12, 0,0,(Math.random()-.5)*.08)));
+    g.add(part('cylinder',0x7a5530, 0,1.98,0, .08,3.55,.08, 0,0,Math.PI/2));
+    const n1=new THREE.Mesh(netGeo(), netMat()); n1.position.set(0,1.08,0); n1.rotation.x=.10; g.add(n1);
+    const n2=new THREE.Mesh(netGeo(true), netMat()); n2.position.set(.35,1.36,.12); n2.rotation.x=-.16; g.add(n2);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.012); decor.add(g); return g;
+  }
+  function makeGalBoat(mast){
+    // a broad-beamed Galilee fishing boat (the "Jesus boat" shape): high rounded stem and stern
+    const g=new THREE.Group(), HULL=0x8a5a2b, RIM=0x9c6b3a;
+    g.add(box(3.8,1.0,1.9,HULL, 0,.74,0));
+    g.add(box(4.3,.4,2.15,RIM, 0,1.26,0));
+    g.add(part('capsule',HULL, 2.1,.82,0, 2.0,.7,1.65, 0,0,Math.PI/2));
+    g.add(part('capsule',HULL,-2.1,.82,0, 2.0,.7,1.65, 0,0,Math.PI/2));
+    if(mast){
+      g.add(part('cylinder',0x6b4423, .4,3.3,0, .09,3.4,.09));
+      g.add(part('cylinder',0x6b4423, .4,4.7,0, .07,2.7,.07, 0,0,Math.PI/2));
+      g.add(sph(0xf0e8d8, .4,4.56,0, 1.3,.26,.15));                       // furled sail
+      g.add(part('cylinder',RIM, -2.5,1.2,.6, .07,2.0,.07, .5,0,.9));     // shipped oar
+    } else {
+      const nt=new THREE.Mesh(netGeo(), netMat());                        // net spilling over the gunwale
+      nt.position.set(.7,1.15,.95); nt.rotation.x=-.9; nt.rotation.y=.12; nt.castShadow=false; g.add(nt);
+      g.add(sph(0xc9a25e, -1.0,1.35,.1, .42,.30,.42));                    // creel of the night's catch
+      g.add(sph(0xb9c8cc, -1.0,1.56,.14, .30,.10,.26));                   // silver fish heaped in it
+      g.add(part('cylinder',RIM, 1.6,1.35,-.5, .07,2.6,.07, 0,0,1.25));   // oar shipped across the thwarts
+    }
+    return g;
+  }
+  function makeJetty(px,seaZ){
+    // the village jetty: plank deck striding out over the water on basalt-footed posts
+    const g=new THREE.Group(), L=9.2, deckY=.72;
+    for(let i=0;i<7;i++){
+      const pl=box(2.0,.13,L/7-.16,(i%2?0x8f5f33:0x9c6b3a), 0,deckY,(i+.5)*L/7);
+      pl.castShadow=false; pl.receiveShadow=true; g.add(pl);
+    }
+    [[-.8,.14],[.8,.38],[-.8,.62],[.8,.86]].forEach(p=>{
+      g.add(part('cylinder',0x6b4a2b, p[0],.3,p[1]*L, .15,1.0,.15));
+      const ft=sph(BASALT[1], p[0],.02,p[1]*L, .34,.14,.34); ft.castShadow=false; g.add(ft);
+    });
+    const moor=part('cylinder',0x7a5530, .85,1.15,L-.5, .13,1.0,.13); g.add(moor);      // mooring post
+    const rope=part('torus',0xc9b48a, .85,1.42,L-.5, .34,.34,.34, Math.PI/2); rope.castShadow=false; g.add(rope);
+    g.position.set(px,0,seaZ-2.6); decor.add(g); return g;
+  }
+  function makeGull(x,y,z,ry){
+    // a white gull, nose along +z; fliers get pushed into vlGulls by the caller
+    const g=new THREE.Group();
+    g.add(sph(0xf4f6f8, 0,0,0, .29,.21,.43));
+    g.add(sph(0xf4f6f8, 0,.15,.37, .155,.14,.175));
+    g.add(conePart(0xe8a13c, 0,.13,.56, .05,.17, Math.PI/2));
+    g.add(sph(0xb9c2c8, 0,.05,-.45, .10,.045,.21));
+    const wL=pivotAt(-.15,.08,0), wR=pivotAt(.15,.08,0);
+    const mkW=s=>{ const w=sph(0xdde4e8, s*.42,0,-.05, .44,.04,.25); w.rotation.y=s*.16; return w; };
+    wL.add(mkW(-1)); wR.add(mkW(1)); g.add(wL,wR);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,y,z); g.rotation.y=ry||0; decor.add(g);
+    return {o:g, wL, wR};
+  }
+  function makeCottage(x,z,ry,big){
+    // a basalt fisher-cottage: dark lumpy fieldstone under a mounded pale-thatch roof
+    const g=new THREE.Group(), W=big?4.4:3.5, D=big?3.3:2.7, H=big?2.4:2.05;
+    const bs=BASALT[Math.floor(Math.random()*4)];
+    const wall=box(W,H,D,bs, 0,H/2,0); g.add(wall);
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(cn=>{                     // boulder-softened corners — fieldstone, not brick
+      const b=new THREE.Mesh(ugeo('blob'), flatMat(BASALT[(Math.random()*4)|0]));
+      b.scale.set(.8,.9+Math.random()*.4,.8); b.position.set(cn[0]*W/2, .55, cn[1]*D/2);
+      b.rotation.y=Math.random()*TAU; b.castShadow=false; b.receiveShadow=true; g.add(b);
+    });
+    const th=THATCH[(Math.random()*3)|0];
+    const roof=sph(th, 0,H+.42,0, W*.66,.82,D*.72); roof.castShadow=true; g.add(roof);
+    const ridge=sph(0xdfcb92, 0,H+1.0,0, W*.34,.30,D*.36); ridge.castShadow=false; g.add(ridge);
+    const door=box(.95,1.5,.1,0x241d15, 0,.75,D/2+.03); door.castShadow=false; g.add(door);
+    const lint=box(1.3,.2,.22,0x6b4a2b, 0,1.6,D/2+.05); lint.castShadow=false; g.add(lint);
+    const win=box(.5,.44,.08,0x1c1712, W*.3,1.3,D/2+.03); win.castShadow=false; g.add(win);
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function makeOven(x,z,ry){
+    // the courtyard tabun — a domed clay bread-oven with the morning's baking smoke drifting up
+    const g=new THREE.Group();
+    g.add(sph(0xb08350, 0,.55,0, .78,.66,.78));
+    g.add(sph(0x241d15, 0,.42,.62, .28,.24,.20));                   // dark mouth
+    const emb=sph(0xff9a4e, 0,.34,.66, .16,.08,.10); emb.material=new THREE.MeshBasicMaterial({color:0xff9a4e}); emb.castShadow=false; g.add(emb);
+    g.traverse(o=>{ if(o.isMesh&&o!==emb) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g);
+    if(!vlSmokeM) vlSmokeM=new THREE.MeshLambertMaterial({color:0xd8d2c8, transparent:true, opacity:.32});
+    for(let i=0;i<4;i++){                                           // puffs rise from the dome top
+      const p=new THREE.Mesh(ugeo('sphere'), vlSmokeM); p.castShadow=false;
+      const y0=1.2, top=5.4+Math.random()*1.2;
+      p.userData={x, z, y:y0+Math.random()*(top-y0), y0, top, vy:.55+Math.random()*.3, s0:.34+Math.random()*.14, ph:Math.random()*TAU};
+      p.scale.setScalar(p.userData.s0); decor.add(p); vlSmoke.push(p);
+    }
+    return g;
+  }
+  function makeAmphora(x,z){
+    const g=new THREE.Group(), c=[0xb5714a,0xc07d52,0xa8663f][(Math.random()*3)|0];
+    g.add(sph(c, 0,.40,0, .29,.40,.29)); g.add(part('cylinder',c, 0,.76,0, .13,.20,.13));
+    g.add(sph(0x8a4f30, 0,.88,0, .16,.05,.16));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.z=(Math.random()-.5)*.1; decor.add(g); return g;
+  }
+  function makeFishLine(x,z,ry){
+    // split fish salted and hung to dry — the smell of a working shore (kept friendly & small)
+    const g=new THREE.Group();
+    [-1.5,1.5].forEach(px=>g.add(part('cylinder',0x6b4a2b, px,.95,0, .10,1.9,.10)));
+    g.add(part('cylinder',0xc9b48a, 0,1.82,0, .035,3.3,.035, 0,0,Math.PI/2));
+    for(let i=0;i<4;i++){ const px=-1.05+i*.7;
+      g.add(sph(0xc4ced2, px,1.48,0, .11,.26,.05));
+      g.add(sph(0x9fb0b8, px,1.20,0, .07,.09,.03));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.008); decor.add(g); return g;
+  }
+  function villageScenery(){
+    vlGulls=[]; vlBob=[]; vlSmoke=[];
+    const seaZ=(waterInfo&&waterInfo.seaZ)||WORLD_R*0.42, W=WORLD_R;
+    // the jetty and its moored boat, off on the up-screen side of the shore
+    const px=-W*0.46;
+    makeJetty(px,seaZ);
+    const mb=makeGalBoat(true); mb.position.set(px+2.7,0,seaZ+4.0); mb.rotation.y=.25; decor.add(mb);
+    vlBob.push({o:mb, y0:0, a:.09, sp:1.1, ph:Math.random()*TAU, rz0:0, ra:.035});
+    // a second boat hauled up on the sand for mending, nets over her gunwale
+    const bb=makeGalBoat(false); bb.position.set(W*0.34,.05,seaZ-2.1); bb.rotation.y=2.55; bb.rotation.z=.13; decor.add(bb);
+    // the cottages stand in a loose lane back from the strand
+    makeCottage(-W*0.62, 2.2, .5, true);
+    makeCottage(-W*0.33, 6.0, .15, false);
+    makeCottage( W*0.50, 1.2, -.6, true);
+    makeCottage( W*0.66, 6.2, -.2, false);
+    makeOven(-W*0.33+2.6, 6.9, .4);
+    // nets drying wherever there's room; the day's catch on the line
+    makeNetRack(-W*0.28, seaZ-3.6, .18);
+    makeNetRack( W*0.17, seaZ-2.9, -.32);
+    makeNetRack( W*0.44, seaZ-5.2, .55);
+    makeFishLine(W*0.52, 4.6, -.5);
+    // jars, creels and cork floats where the boats land
+    makeAmphora(px+1.6, seaZ-3.4); makeAmphora(px+2.3, seaZ-3.1); makeAmphora(-W*0.62+2.9, 3.4);
+    makeAmphora(W*0.30, seaZ-3.6); makeAmphora(W*0.50-2.4, 2.6);
+    [[px+6.5,seaZ+6.5],[W*0.12,seaZ+4.5],[W*0.5,seaZ+7.5]].forEach(p=>{
+      const bu=sph(0xd8543a, p[0],.14,p[1], .26,.22,.26); bu.castShadow=false; decor.add(bu);
+      vlBob.push({o:bu, y0:.14, a:.10, sp:1.5, ph:Math.random()*TAU, rz0:0, ra:.0});
+    });
+    // gulls: three riding circles over the waterline, two perched and watching for scraps
+    [[px+3,seaZ+2,7.5,5.5,.42],[W*0.3,seaZ-1,6.4,4.4,-.5],[2,seaZ+5.5,8.8,6.6,.36]].forEach((c,i)=>{
+      const gl=makeGull(c[0],c[2],c[1],0);
+      vlGulls.push({o:gl.o, wL:gl.wL, wR:gl.wR, cx:c[0], cz:c[1], h:c[2], r:c[3], sp:c[4], ph:Math.random()*TAU});
+    });
+    makeGull(px+.85, 1.86, seaZ-2.6+8.7, 2.8);                     // on the jetty's mooring post
+    makeGull(W*0.34+1.6, 2.1, seaZ-1.2, -2.2);                     // on the beached boat's high prow
+    // the land side: olive-green trees, a couple of shore palms, rocks and wildflowers
+    for(let i=0;i<7;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7 && z<seaZ-6) makeTree(x,z); }
+    makePalm(px-3.5, seaZ-4.5); makePalm(W*0.62, seaZ-6.5);
+    for(let i=0;i<6;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>6) makeRock(x,z,.45+Math.random()*.5); }
+    for(let i=0;i<12;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4 && z<seaZ-7) makeFlower(x,z); }
+    for(let i=0;i<8;i++){ const x=(Math.random()*2-1)*(W-2), z=seaZ-1.2-Math.random()*2.2;   // shells on the strand
+      const sh=sph([0xf2e6d2,0xe8d4ba,0xf6efe2][(Math.random()*3)|0], x,.05,z, .14,.07,.12);
+      sh.rotation.y=Math.random()*TAU; sh.castShadow=false; decor.add(sh); }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -1941,6 +2137,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       tombScenery();
     } else if(d==='furnace'){
       furnaceScenery();
+    } else if(d==='village'){
+      villageScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2859,6 +3057,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
   const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
   const SCORCH =[0x4a3c31,0x413429,0x55453a,0x382d24];   // the plain of Dura — ash-gray earth scorched warm around the kiln (furnace biome)
+  const GALIL  =[0x8cab55,0x7f9f4d,0x99b761,0x729449];   // dry summer grass above the Galilee shore (village biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2975,7 +3174,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'jonah', name:'Jonah & the Great Fish', emoji:'🐋', type:'reach',
       goal:'Walk along the shore to the great fish!',
       verse:'“The Lord provided a great fish to swallow Jonah.” — Jonah 1:17',
-      env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+      env:{ ground:GALIL, water:'sea', sky:0xbfe2f0, fogFar:102, decor:'village' } },
     { id:'storm', name:'Jesus Calms the Storm', emoji:'⛵', type:'reach',
       goal:'The wind and waves obey Jesus! Walk out to the boat where He is!',
       verse:'“He got up, rebuked the wind and said to the waves, ‘Quiet! Be still!’ Then the wind died down and it was completely calm.” — Mark 4:39',
@@ -2991,7 +3190,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'feeding', name:'Feeding the 5000', emoji:'🧺', type:'collect', base:9, item:'bread',
       goal:'Gather the loaves and fish to share with everyone!',
       verse:'“He gave thanks and broke the loaves… and all ate and were satisfied.” — Matthew 14:19-20',
-      env:{ ground:LUSH, water:'lake', sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:GALIL, water:'sea', sky:0xbfe2f0, fogFar:102, decor:'village' } },
     { id:'star', name:'Follow the Star', emoji:'⭐', type:'reach',
       goal:'Follow the bright star to find baby Jesus!',
       verse:'“We saw his star… and have come to worship him.” — Matthew 2:2',
@@ -3003,7 +3202,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'fishers', name:'Fishers of Men', emoji:'🐟', type:'collect', base:9, item:'fish',
       goal:'Jesus called fishermen to be His helpers! Gather the fish along the shore, then follow Him!',
       verse:'“‘Come, follow me,’ Jesus said, ‘and I will send you out to fish for people.’” — Matthew 4:19',
-      env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+      env:{ ground:GALIL, water:'sea', sky:0xbfe2f0, fogFar:102, decor:'village' } },
     { id:'builders', name:'The Wise Builder', emoji:'🏠', type:'reach',
       goal:'The storm came, but the wise man’s house stood strong! Walk to the house built on the rock!',
       verse:'“…like a wise man who built his house on the rock. The rain came down… yet it did not fall, because it had its foundation on the rock.” — Matthew 7:24-25',
@@ -3011,7 +3210,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'walkwater', name:'Jesus Walks on Water', emoji:'🌊', type:'reach',
       goal:'Keep your eyes on Jesus and walk across the water to Him!',
       verse:'“Take courage! It is I. Don’t be afraid.” — Matthew 14:27',
-      env:{ ground:SAND, water:'sea', sky:0x9fd8ff, decor:'beach' } },
+      env:{ ground:GALIL, water:'sea', sky:0xbfe2f0, fogFar:102, decor:'village' } },
     { id:'samaritan', name:'The Good Samaritan', emoji:'💗', type:'reach',
       goal:'A hurt traveler needs help on the lonely road! Be a kind neighbor — walk to him!',
       verse:'“‘The one who had mercy on him.’ Jesus told him, ‘Go and do likewise.’” — Luke 10:37',
@@ -3870,6 +4069,28 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           fl.scale.y=b*(1+Math.sin(T*7+i*2.1)*0.16+Math.sin(T*13+i)*0.06);
           fl.position.y=fl.scale.y/2+.2;                        // tongues stay rooted at the hearth
           fl.rotation.z=Math.sin(T*3.2+i*1.7)*0.1; }
+      }
+    }
+    // ---- village biome: gulls ride slow circles over the waterline, the moored boat and the
+    //      cork floats lift on the swell, and the tabun's baking-smoke drifts off inland ----
+    if(currentEnv && currentEnv.decor==='village'){
+      for(const gl of vlGulls){ const a=T*gl.sp+gl.ph;
+        gl.o.position.set(gl.cx+Math.cos(a)*gl.r, gl.h+Math.sin(T*0.9+gl.ph*2)*0.55, gl.cz+Math.sin(a)*gl.r);
+        gl.o.rotation.y=Math.atan2(-Math.sin(a), Math.cos(a))+(gl.sp<0?Math.PI:0);
+        gl.o.rotation.z=(gl.sp<0?.22:-.22);                       // banked into the turn
+        const gt=Math.sin(T*.5+gl.ph);                             // gulls mostly glide, then a burst of flaps
+        const fl=gt>0 ? Math.sin(T*8+gl.ph)*.5 : .16;
+        gl.wL.rotation.z=fl; gl.wR.rotation.z=-fl;
+      }
+      for(const b of vlBob){
+        b.o.position.y=b.y0+Math.sin(T*b.sp+b.ph)*b.a;
+        if(b.ra){ b.o.rotation.z=b.rz0+Math.sin(T*b.sp*.8+b.ph)*b.ra; b.o.rotation.x=Math.sin(T*b.sp*.63+b.ph*1.7)*b.ra*.7; }
+      }
+      for(const p of vlSmoke){ const d=p.userData;
+        d.y += d.vy*dt; if(d.y>d.top) d.y=d.y0;
+        const gr=(d.y-d.y0)/(d.top-d.y0);
+        p.position.set(d.x+Math.sin(T*.55+d.ph)*(.15+gr*1.1)-gr*1.6, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.8)-gr*1.2);
+        p.scale.setScalar(d.s0*(.5+gr*1.4));                       // each puff swells and leans inland as it lifts
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
