@@ -332,6 +332,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffd9c2); ambLight.intensity = 0.34;
       return;
     }
+    if(currentEnv && currentEnv.decor==='furnace'){
+      // the plain of Dura by night (Daniel 3): smoke has swallowed the stars, and the only
+      // key on the plain is the FIRE itself — a hard low orange rim raking in from the kiln's
+      // diagonal, while the last cold slate of evening fills the shadows from the far sky
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x3a221a), 0.5), near||30, far||78);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 1.05; sun.color.set(0xff9450);
+      sun.position.set(-26, 14, -26);              // low, from the furnace — everything wears an ember rim
+      hemi.color.set(0x46506e); hemi.groundColor.set(0x241a14); hemi.intensity = 0.55;
+      ambLight.color.set(0xff9d6a); ambLight.intensity = 0.20;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -1762,11 +1774,144 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- The plain of Dura by night (the 'furnace' biome — Daniel 3): a smoke-veiled
+  //      Babylonian dark. Up the camera diagonal the great kiln roars — its mouth is the one
+  //      warm beacon on the plain — backed by a fired-brick rampart crowned with Babylon's
+  //      blue glaze and gold rosettes. Off its shoulder the golden image towers over a crowd
+  //      flat on their faces; a brazier-lit causeway walks the kid straight to the fire, past
+  //      ember pits that breathe, climbing sparks, and snags still smoldering from the heat. ----
+  const FN_A = Math.PI*1.25;                       // the kiln waits up-screen on the (-x,-z) diagonal
+  let fnSparks = [], fnSmoke = [];
+  const fnEmberM = new THREE.MeshBasicMaterial({color:0xff7b2e, transparent:true, opacity:0.30,
+    blending:THREE.AdditiveBlending, depthWrite:false});
+  const fnSparkM = new THREE.MeshBasicMaterial({color:0xffc27a, fog:false});
+  const fnSmokeM = new THREE.MeshLambertMaterial({color:0x2c2320, transparent:true, opacity:0.4, depthWrite:false});
+  const fnGoldM  = new THREE.MeshBasicMaterial({color:0xf2ca62});   // idol gold — self-lit, firelight never leaves it
+  const fnGoldD  = new THREE.MeshBasicMaterial({color:0xd3a848});
+  const FN_BRICK = [0x4e372b, 0x59402e, 0x453127, 0x63452f];        // fire-darkened kiln brick
+  const FN_GLAZE = 0x2a5a96;                                        // Babylon's glazed lapis-blue courses
+  function fnSpark(x,z,y0,top){
+    const s=new THREE.Mesh(ugeo('sphere'), fnSparkM);
+    s.userData={x,z, y0, y:y0+Math.random()*(top-y0), top, vy:1.5+Math.random()*1.5,
+      wa:.4+Math.random()*.4, ww:1.2+Math.random(), ph:Math.random()*TAU};
+    s.scale.setScalar(.1); s.castShadow=false;
+    decor.add(s); fnSparks.push(s); return s;
+  }
+  function fnBrazier(x,z){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0x38302a, 0,.95,0, .14,1.9,.14));                     // iron post
+    g.add(part('cylinder',0x463830, 0,1.95,0, .60,.36,.60));                    // fire bowl
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffa347}));
+    fl.position.y=2.45; fl.scale.set(.62,1.0,.62); g.add(fl);
+    const core=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe1a0}));
+    core.position.y=2.36; core.scale.set(.32,.58,.32); g.add(core);
+    const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffb060, transparent:true, opacity:.28}));
+    halo.position.y=2.5; halo.scale.setScalar(1.5); g.add(halo);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); windify(g,0.025); decor.add(g);                      // the sway loop = flame flicker
+    const pool=new THREE.Mesh(ugeo('sphere'), fnEmberM);                        // warm pool it throws on the ash
+    pool.position.set(x,.05,z); pool.scale.set(3.4,.02,2.9); pool.castShadow=false; decor.add(pool);
+  }
+  function fnSnag(x,z){
+    // a tree the great heat left behind — black, bare, one ember still alive in the wood
+    const g=new THREE.Group(), s=.75+Math.random()*.55, ln=(Math.random()-.5)*.5;
+    g.add(part('robe',0x241d18, 0,1.05*s,0, .42*s,2.1*s,.38*s, 0,0,ln*.5));
+    g.add(part('robe',0x2e2620, ln*1.1,2.0*s,.1, .17*s,1.5*s,.17*s, 0,0,ln*1.4));
+    g.add(part('robe',0x1c1613, -ln*.9,1.8*s,-.15, .13*s,1.1*s,.13*s, 0,0,-ln*1.8));
+    const em=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xff6a2a}));
+    em.position.set(ln*1.5,2.7*s,.12); em.scale.setScalar(.09*s+.05); g.add(em);
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; }); g.children[0].castShadow=true;
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g);
+  }
+  function furnaceScenery(){
+    fnSparks=[]; fnSmoke=[];
+    const gR=WORLD_R-5, gx=Math.cos(FN_A)*gR, gz=Math.sin(FN_A)*gR;   // must match the kiln placement in startMission
+    // — the fired-brick rampart arcing behind the kiln, crowned in blue glaze and gold rosettes —
+    for(let s=-6;s<=6;s++){
+      if(Math.abs(s)<2) continue;                                     // the kiln ensemble fills the middle
+      const a=FN_A+s*0.13, r=WORLD_R+6.5, wx=Math.cos(a)*r, wz=Math.sin(a)*r;
+      const h=7.5+(Math.abs(s*7)%3)*0.6;
+      const seg=box(6.8,h,1.8, FN_BRICK[(s+6)%4], wx,h/2,wz);
+      seg.rotation.y=-a+Math.PI/2; seg.castShadow=false; seg.receiveShadow=true; decor.add(seg);
+      const gl=box(6.9,.7,1.9, FN_GLAZE, wx,h-1.15,wz);               // the lapis frieze course
+      gl.rotation.y=-a+Math.PI/2; gl.castShadow=false; decor.add(gl);
+      for(let rj=-1;rj<=1;rj++){                                      // gold rosettes riding the frieze
+        const ra=a+rj*0.045, rr=r-1.1;
+        const ro=new THREE.Mesh(ugeo('sphere'), fnGoldM);
+        ro.position.set(Math.cos(ra)*rr, h-1.15, Math.sin(ra)*rr); ro.scale.setScalar(.3); ro.castShadow=false; decor.add(ro);
+      }
+      for(let mj=-1;mj<=1;mj++){                                      // crenellated crown
+        const ma=a+mj*0.05;
+        const me=box(1.5,.9,1.7, FN_BRICK[(s+mj+8)%4], Math.cos(ma)*r, h+.45, Math.sin(ma)*r);
+        me.rotation.y=-a+Math.PI/2; me.castShadow=false; decor.add(me);
+      }
+    }
+    // — the golden image on its ziggurat base, off the kiln's shoulder (Dan 3:1) —
+    const ia=FN_A+0.82, ir=WORLD_R+8, ix=Math.cos(ia)*ir, iz=Math.sin(ia)*ir;
+    const img=new THREE.Group();
+    img.add(box(9.5,1.6,9.5, 0x3a2b22, 0,.8,0));
+    img.add(box(7.4,1.5,7.4, 0x46332a, 0,2.3,0));
+    img.add(box(7.6,.42,7.6, FN_GLAZE, 0,3.15,0));                    // one gleaming lapis course
+    img.add(box(5.4,1.3,5.4, 0x54402f, 0,3.95,0));
+    const ib=new THREE.Mesh(ugeo('robe'), fnGoldM);                   // the stiff towering idol
+    ib.scale.set(2.9,9.6,2.4); ib.position.y=9.4; img.add(ib);
+    const iarmL=new THREE.Mesh(ugeo('capsule'), fnGoldD); iarmL.scale.set(.7,2.1,.7); iarmL.position.set(-1.7,10.6,0); img.add(iarmL);
+    const iarmR=iarmL.clone(); iarmR.position.x=1.7; img.add(iarmR);
+    const ih=new THREE.Mesh(ugeo('sphere'), fnGoldM); ih.scale.setScalar(2.0); ih.position.y=15.1; img.add(ih);
+    const ic=new THREE.Mesh(ugeo('cone'), fnGoldD); ic.scale.set(1.5,1.2,1.5); ic.position.y=16.3; img.add(ic);
+    const iglow=new THREE.Mesh(ugeo('sphere'), fnEmberM);             // brazier-light washing up its base
+    iglow.scale.set(11,.03,11); iglow.position.y=4.3; img.add(iglow);
+    img.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=false; } });
+    img.position.set(ix,0,iz); img.rotation.y=Math.atan2(-ix,-iz); decor.add(img);
+    // — the crowd that bowed, flat on their faces before it… while three stood (Dan 3:7,12) —
+    const ROBES=[0x5a5470,0x54666e,0x6e5a54,0x5e6a54,0x665470];
+    for(let k=0;k<7;k++){
+      const ka=ia+(k-3)*0.055, kr=WORLD_R+1.4+(k%3)*1.5, kx=Math.cos(ka)*kr, kz=Math.sin(ka)*kr;
+      const b=new THREE.Group();
+      b.add(part('capsule',ROBES[k%5], 0,.42,0, .5,.6,.44, 1.2,0,0));  // bowed to the ground
+      b.add(sph(0xcf9c6c, 0,.34,.56, .16));
+      b.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      b.position.set(kx,0,kz); b.rotation.y=Math.atan2(ix-kx,iz-kz); decor.add(b);
+    }
+    // — the brazier-lit causeway: two rows of firelight walking the kid straight to the kiln —
+    const px=Math.cos(FN_A+Math.PI/2), pz=Math.sin(FN_A+Math.PI/2);
+    [[.34,1],[.34,-1],[.58,1],[.58,-1],[.82,1],[.82,-1]]
+      .forEach(bp=>fnBrazier(gx*bp[0]+px*4.6*bp[1], gz*bp[0]+pz*4.6*bp[1]));
+    // — the scorched plain: ember pits, coal-black boulders, ash drifts, smoldering snags —
+    const len2=gx*gx+gz*gz, clearOfPath=(x,z)=>{                      // keep the walk to the fire open
+      const tt=Math.max(0,Math.min(1,(x*gx+z*gz)/len2));
+      return Math.hypot(x-gx*tt, z-gz*tt)>5.2 && Math.hypot(x-gx,z-gz)>7; };
+    let n=0, guard=0;
+    while(n<6 && guard++<60){ const [x,z]=randPos(3);
+      if(Math.hypot(x,z)>7 && clearOfPath(x,z)){
+        const pit=new THREE.Mesh(ugeo('sphere'), fnEmberM);           // a breathing fissure of live coals
+        pit.position.set(x,.06,z); pit.scale.set(2.4+Math.random()*1.6,.02,1.7+Math.random()*1.1);
+        pit.rotation.y=Math.random()*TAU; pit.castShadow=false; decor.add(pit);
+        for(let c=0;c<3;c++){ const ca=Math.random()*TAU, cr=1.3+Math.random()*.9;
+          const co=new THREE.Mesh(ugeo('blob'), flatMat(c?0x241d18:0x2e2620));
+          co.position.set(x+Math.cos(ca)*cr,.18,z+Math.sin(ca)*cr);
+          co.scale.set(.6+Math.random()*.5,.35,.5+Math.random()*.4);
+          co.rotation.y=Math.random()*TAU; co.castShadow=false; decor.add(co); }
+        for(let sp=0;sp<3;sp++) fnSpark(x+(Math.random()-.5)*1.6, z+(Math.random()-.5)*1.2, .25, 2.6+Math.random()*1.6);
+        n++; }
+    }
+    n=0; guard=0;
+    while(n<6 && guard++<50){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6 && clearOfPath(x,z)){ fnSnag(x,z); n++; } }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(2.5);
+      if(!clearOfPath(x,z)) continue;
+      const b=new THREE.Mesh(ugeo('boulder'), flatMat(i%2?0x342a22:0x3e3128));
+      b.scale.set(1.1+Math.random()*1.2,.8+Math.random()*.9,1.0+Math.random()*1.0);
+      b.rotation.y=Math.random()*TAU; b.position.set(x,.25,z); b.castShadow=false; b.receiveShadow=true; decor.add(b); }
+    for(let i=0;i<7;i++){ const [x,z]=randPos(2);                     // pale drifts of settled ash
+      const a=sph(0x6b6259, x,.05,z, 1.1+Math.random()*.8, .06, .8+Math.random()*.6);
+      a.rotation.y=Math.random()*TAU; a.castShadow=false; decor.add(a); }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
     const env = currentEnv || {}, d = env.decor || 'forest';
-    ambient.visible = !env.interior;       // no butterflies drifting through the temple
+    ambient.visible = !env.interior && d!=='furnace';   // no butterflies in the temple — or over the coals of Dura
     const nT=Math.round(WORLD_R*0.55), nR=Math.round(WORLD_R*0.4), nF=Math.round(WORLD_R*0.8);
     if(d==='desert'){
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -1794,6 +1939,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       redseaScenery();
     } else if(d==='tomb'){
       tombScenery();
+    } else if(d==='furnace'){
+      furnaceScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2711,6 +2858,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
   const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
   const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
+  const SCORCH =[0x4a3c31,0x413429,0x55453a,0x382d24];   // the plain of Dura — ash-gray earth scorched warm around the kiln (furnace biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -2819,7 +2967,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'furnace', name:'The Fiery Furnace', emoji:'🔥', type:'reach',
       goal:'Shadrach, Meshach and Abednego trusted God, and He kept them safe in the fire! Walk to the furnace and see the fourth man walking with them!',
       verse:'“He said, ‘Look! I see four men walking around in the fire, unbound and unharmed, and the fourth looks like a son of the gods.’” — Daniel 3:25',
-      env:{ ground:SAND, water:null, sky:0xe8bc90, fogFar:84, decor:'desert' } },
+      env:{ ground:SCORCH, water:null, sky:0x1d1310, fogNear:30, fogFar:78, decor:'furnace', night:true } },
     { id:'daniel', name:'Daniel & the Lions', emoji:'🙏', type:'reach',
       goal:'God kept the lions gentle — walk safely to Daniel!',
       verse:'“My God sent his angel, and he shut the mouths of the lions.” — Daniel 6:22',
@@ -3263,28 +3411,60 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const lt=new THREE.PointLight(0xffc98a,1.0,16); lt.position.set(gx,3.2,gz); props.add(lt);
         const isa=makeNPC('isaiah'); isa.position.set(3,0,3); isa.rotation.y=Math.atan2(gx-3,gz-3); props.add(isa);
         say('God asked: Who will go for us? Say it like Isaiah — Here am I, send me! Walk to the glowing altar! 😮',4200);
-      } else if(mission.id==='furnace'){ // the fiery furnace — four men walking unharmed in the flames
-        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+      } else if(mission.id==='furnace'){ // the fiery furnace — four men walking unharmed in the flames.
+        // Pinned on the camera diagonal: the mouth of the great kiln is the one warm beacon on the
+        // dark plain of Dura (the furnace biome builds the rampart + golden image around FN_A)
+        const R=WORLD_R-5, gx=Math.cos(FN_A)*R, gz=Math.sin(FN_A)*R;
         const fn=new THREE.Group(); fn.position.set(gx,0,gz); fn.rotation.y=Math.atan2(-gx,-gz);
-        fn.add(box(7,4.2,4.5,0x8a8378, 0,2.1,-.6));                            // great stone furnace
-        fn.add(sph(0x6e685e, 0,4.55,-.6, 3.9,1.0,2.6));                        // domed top
-        fn.add(part('cylinder',0x5e594e, 0,5.6,-.6, .55,1.4,.55));             // smoking chimney
-        const op=box(3.6,3.2,.5,0x2c2216, 0,1.6,1.70); op.castShadow=false; fn.add(op);   // the wide glowing doorway
-        const fmo=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xff9d3a}));
-        fmo.scale.set(1.7,1.5,.5); fmo.position.set(0,.75,1.86); fmo.castShadow=false; fn.add(fmo);    // outer flames
-        const fmi=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffd166}));
-        fmi.scale.set(1.05,1.0,.4); fmi.position.set(.25,.55,1.94); fmi.castShadow=false; fn.add(fmi); // bright inner flames
-        [[-1.05,0x5f83c4],[0,0x9a4f35],[1.05,0x6f8a3f]].forEach(m=>{           // Shadrach, Meshach & Abednego, calm and unharmed
-          const guy=new THREE.Group(); guy.position.set(m[0],0,2.05);
-          guy.add(part('capsule',m[1], 0,.85,0, .34,.95,.30)); guy.add(sph(0xdba876, 0,1.62,0, .22,.21,.22));
+        const dome=new THREE.Mesh(ugeo('sphere'), flatMat(0x4c332a));          // the great beehive kiln,
+        dome.scale.set(10.6,11.8,10.0); dome.position.set(0,2.4,-2.0);         // heated seven times hotter (Dan 3:19)
+        dome.castShadow=true; dome.receiveShadow=true; fn.add(dome);
+        const shoulderL=new THREE.Mesh(ugeo('boulder'), flatMat(0x59402e));    // brick buttress lumps at its flanks
+        shoulderL.scale.set(4.2,3.4,3.6); shoulderL.position.set(-4.6,1.2,.6); shoulderL.castShadow=false; shoulderL.receiveShadow=true; fn.add(shoulderL);
+        const shoulderR=shoulderL.clone(); shoulderR.material=flatMat(0x453127); shoulderR.position.set(4.8,1.0,.4); shoulderR.rotation.y=1.7; fn.add(shoulderR);
+        fn.add(part('cylinder',0x3c2b22, 0,8.9,-2.0, 1.7,3.2,1.7));            // soot-black chimney
+        fn.add(part('cylinder',0x2c211a, 0,10.4,-2.0, 2.0,.5,2.0));            // scorched rim cap
+        fn.add(box(1.6,5.8,1.7, 0x3a2a22, -2.6,2.9,3.0));                      // door jambs
+        fn.add(box(1.6,5.8,1.7, 0x3a2a22,  2.6,2.9,3.0));
+        fn.add(box(6.8,1.6,1.8, 0x46332a, 0,6.3,3.0));                         // lintel
+        fn.add(box(6.9,.42,1.9, 0x2a5a96, 0,5.6,3.05));                        // one lapis course over the fire
+        const step=box(6.6,.5,3.4, 0x554038, 0,.25,5.0); step.castShadow=false; fn.add(step);  // the doorstep slab
+        const fireW=new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({color:0xff7a26, fog:false}));
+        fireW.scale.set(4.6,5.5,.4); fireW.position.set(0,2.75,3.15); fireW.castShadow=false; fn.add(fireW);  // the roaring wall of fire
+        const fireC=new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({color:0xffb75c, fog:false}));
+        fireC.scale.set(3.0,3.4,.4); fireC.position.set(0,1.9,3.30); fireC.castShadow=false; fn.add(fireC);   // its white-hot heart
+        const flames=new THREE.Group(); flames.position.set(0,0,3.55);         // licking tongues, flickered in frame()
+        for(let f=0;f<4;f++){
+          const h=1.6+Math.random()*1.4, fx=-1.7+f*1.15+(Math.random()-.5)*.3;
+          const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:f%2?0xffd166:0xff9d3a, fog:false}));
+          fl.scale.set(.8,h,.5); fl.position.set(fx,h/2+.2,0); fl.castShadow=false;
+          fl.userData.b=h; flames.add(fl); }
+        fn.add(flames);
+        [[-1.35,0x5f83c4],[0,0x9a4f35],[1.35,0x6f8a3f]].forEach(m=>{           // Shadrach, Meshach & Abednego —
+          const guy=new THREE.Group(); guy.position.set(m[0],0,4.4);           // standing tall, calm and unharmed
+          guy.add(part('capsule',m[1], 0,1.0,0, .48,1.0,.42)); guy.add(sph(0xdba876, 0,2.28,0, .26,.25,.26));
           guy.traverse(o=>{ if(o.isMesh) o.castShadow=false; }); fn.add(guy); });
-        const four=new THREE.Group(); four.position.set(.5,0,2.28);            // and the fourth, shining like a son of the gods
-        const shm=new THREE.MeshBasicMaterial({color:0xfff6dc});
-        const fb=new THREE.Mesh(ugeo('capsule'), shm); fb.scale.set(.36,1.05,.32); fb.position.y=.95; fb.castShadow=false; four.add(fb);
-        const fh=new THREE.Mesh(ugeo('sphere'), shm); fh.scale.setScalar(.23); fh.position.y=1.80; fh.castShadow=false; four.add(fh);
+        const four=new THREE.Group(); four.position.set(.6,0,3.9);             // and the fourth, a step deeper in the
+        const shm=new THREE.MeshBasicMaterial({color:0xfff6dc, fog:false});    // fire, shining like a son of the gods
+        const fb=new THREE.Mesh(ugeo('capsule'), shm); fb.scale.set(.5,1.15,.44); fb.position.y=1.15; fb.castShadow=false; four.add(fb);
+        const fh=new THREE.Mesh(ugeo('sphere'), shm); fh.scale.setScalar(.5); fh.position.y=2.55; fh.castShadow=false; four.add(fh);
+        const fhalo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xfff2cc, transparent:true, opacity:.3,
+          blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+        fhalo.scale.set(1.6,3.4,1.4); fhalo.position.y=1.5; fhalo.castShadow=false; four.add(fhalo);
         fn.add(four);
+        const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffa050, transparent:true, opacity:.32,
+          blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));     // the mouth's standing radiance
+        halo.scale.set(8.0,6.4,4.5); halo.position.set(0,3.0,4.1); halo.castShadow=false; fn.add(halo);
+        const spill=new THREE.Mesh(ugeo('sphere'), fnEmberM);                  // firelight pooling out the door
+        spill.scale.set(10,.02,8); spill.position.set(0,.07,6.2); spill.castShadow=false; fn.add(spill);
         props.add(fn); missionCtx.goalObj=fn;
-        const lt=new THREE.PointLight(0xff9d3a,1.2,18); lt.position.set(gx*0.92,2.2,gz*0.92); props.add(lt);
+        const lt=new THREE.PointLight(0xff8a3a,1.7,26); lt.position.set(gx*0.86,3.0,gz*0.86); props.add(lt);
+        fn.userData.glow=lt; fn.userData.halo=halo; fn.userData.flames=flames; // breathed in frame()
+        const cxx=Math.cos(FN_A)*(R+2.0), czz=Math.sin(FN_A)*(R+2.0);          // sparks + smoke climbing off the chimney
+        for(let sp=0;sp<7;sp++) fnSpark(cxx+(Math.random()-.5)*1.4, czz+(Math.random()-.5)*1.4, 10.6, 16+Math.random()*2);
+        for(let sm=0;sm<4;sm++){ const p=new THREE.Mesh(ugeo('sphere'), fnSmokeM);
+          p.userData={x:cxx, z:czz, y0:10.8, y:10.8+sm*1.8, top:18, vy:.9+Math.random()*.5, ph:Math.random()*TAU, s0:1.7+Math.random()*.9};
+          p.position.set(cxx, p.userData.y, czz); p.castShadow=false; props.add(p); fnSmoke.push(p); }
         const dn=makeNPC('daniel'); dn.position.set(3,0,3); dn.rotation.y=Math.atan2(gx-3,gz-3); props.add(dn);   // a friend watching in wonder
         say('They would only bow to God — and God kept them safe! Count the men in the fire: four! Walk to the furnace! 🔥',4200);
       } else if(mission.id==='elijahangel'){ // God's kind angel wakes tired Elijah with fresh bread
@@ -3663,6 +3843,33 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const br=1+Math.sin(T*1.4)*0.16+Math.sin(T*3.7)*0.05;   // candle-soft, never strobing
         tb.userData.glow.intensity=1.6*br;
         tb.userData.halo.material.opacity=0.30*br;
+      }
+    }
+    // ---- furnace biome: sparks climb the dark, ember pits breathe, the kiln mouth roars ----
+    if(currentEnv && currentEnv.decor==='furnace'){
+      for(const s of fnSparks){ const d=s.userData;
+        d.y += d.vy*dt; if(d.y>d.top) d.y=d.y0;
+        s.position.set(d.x+Math.sin(T*d.ww+d.ph)*d.wa, d.y, d.z+Math.cos(T*d.ww*0.8+d.ph)*d.wa*0.6);
+        const f=1-(d.y-d.y0)/(d.top-d.y0);
+        s.scale.setScalar(.05+.1*f);                            // shrinks and dims as it climbs and cools
+      }
+      fnEmberM.opacity = 0.30+Math.sin(T*1.7)*0.07+Math.sin(T*4.3)*0.04;   // every coal bed breathing together
+      for(const p of fnSmoke){ const d=p.userData;
+        d.y += d.vy*dt; if(d.y>d.top) d.y=d.y0;
+        const g=(d.y-d.y0)/(d.top-d.y0);
+        p.position.set(d.x+Math.sin(T*.5+d.ph)*(0.4+g*1.6), d.y, d.z+Math.cos(T*.4+d.ph)*(0.3+g*1.2));
+        p.scale.setScalar(d.s0*(0.6+g*1.1));                    // each puff swells as it lifts into the night
+      }
+      const fu=missionCtx&&missionCtx.goalObj;
+      if(fu&&fu.userData.glow){
+        const br=1+Math.sin(T*2.1)*0.14+Math.sin(T*5.3)*0.07;   // a live fire's roar, never strobing
+        fu.userData.glow.intensity=1.7*br;
+        fu.userData.halo.material.opacity=0.32*br;
+        const fls=fu.userData.flames.children;
+        for(let i=0;i<fls.length;i++){ const fl=fls[i], b=fl.userData.b;
+          fl.scale.y=b*(1+Math.sin(T*7+i*2.1)*0.16+Math.sin(T*13+i)*0.06);
+          fl.position.y=fl.scale.y/2+.2;                        // tongues stay rooted at the hearth
+          fl.rotation.z=Math.sin(T*3.2+i*1.7)*0.1; }
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
