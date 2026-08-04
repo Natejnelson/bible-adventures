@@ -319,6 +319,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffe2ba); ambLight.intensity = 0.36;
       return;
     }
+    if(currentEnv && currentEnv.decor==='tomb'){
+      // the first Easter sunrise (Matthew 28:1, "at dawn on the first day of the week"):
+      // the sun has just cleared the ridge BEHIND the tomb — a low pink-gold key backlights
+      // the whole garden up the camera diagonal, mist holds the last cool of the night,
+      // and a soft violet fill keeps every shadow gentle instead of black
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xdcaabc), 0.36), near||34, far||88);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 1.1; sun.color.set(0xffc9a0);
+      sun.position.set(-24, 18, -30);              // barely risen — long shadows reach back down the garden path
+      hemi.color.set(0xcab2d8); hemi.groundColor.set(0x4d6a52); hemi.intensity = 0.8;
+      ambLight.color.set(0xffd9c2); ambLight.intensity = 0.34;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -1631,6 +1644,124 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     disc.scale.set(5.5, 5.5, 1); disc.position.set(0, RS_H+0.4, -(WORLD_R+29)); disc.castShadow=false; rs.add(disc);
   }
 
+  // ---- The garden tomb at dawn (the 'tomb' biome — Matthew 28, John 20): Easter morning.
+  //      A dew-cool garden folded into a rock escarpment; the just-risen sun pours through a
+  //      notch in the cliff DIRECTLY behind the tomb so the empty doorway sits in a halo of
+  //      sunrise; ground mist drifts between gnarled olives and cypress spires; three tiny
+  //      empty crosses stand far off on a hill — Friday behind, Sunday straight ahead. ----
+  const GT_A = Math.PI*1.25;                       // the tomb waits up-screen on the (-x,-z) diagonal
+  let gtMist = [];
+  const gtMistM  = new THREE.MeshLambertMaterial({color:0xffeadf, transparent:true, opacity:0.15, depthWrite:false});
+  const gtDawnM  = new THREE.MeshBasicMaterial({color:0xffb488, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const gtSunM   = new THREE.MeshBasicMaterial({color:0xfff3da, fog:false});
+  const gtShaftM = new THREE.MeshBasicMaterial({color:0xffd9b0, transparent:true, opacity:0.06, blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const GT_ROCK  = [0xb5a48d,0xa8957e,0xc2b098,0x9a8974];   // pale dawn-warmed limestone
+  const GT_OLIVE = [0x7f9468,0x8da177,0x71875e];            // silver-green olive foliage
+  function makeOlive(x,z){
+    // an old olive: short gnarled split trunk, wind-layered silver crown
+    const g=new THREE.Group(), s=.85+Math.random()*.5, lean=(Math.random()-.5)*.4;
+    g.add(part('robe',0x6e5940, 0,.95*s,0, .62*s,1.9*s,.55*s, 0,0,lean*.5));
+    g.add(part('robe',0x7a6349, lean*1.2,1.75*s,.1, .34*s,1.7*s,.34*s, 0,0,lean));       // twisting upper fork
+    g.add(part('robe',0x64503a, -lean*.9,1.5*s,-.2, .26*s,1.3*s,.26*s, 0,0,-lean*1.3));  // second limb
+    const cy=2.7*s;
+    g.add(sph(GT_OLIVE[0], lean*1.6,cy,0, 1.55*s,.85*s,1.45*s));
+    g.add(sph(GT_OLIVE[1], lean*1.6+.8*s,cy+.55*s,.25*s, .95*s,.55*s,.9*s));
+    g.add(sph(GT_OLIVE[2], lean*1.6-.9*s,cy-.3*s,-.3*s, .9*s,.5*s,.85*s));
+    g.add(sph(GT_OLIVE[1], -lean*1.1,cy-.55*s,.5*s, .8*s,.45*s,.75*s));
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=true; } });
+    g.children[0].castShadow=true;                            // one long dawn shadow per tree is enough
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
+  }
+  function makeCypress(x,z){
+    const g=new THREE.Group(), s=.9+Math.random()*.6;
+    g.add(part('cylinder',0x5e4a34, 0,.5*s,0, .16*s,1.0*s,.16*s));
+    g.add(part('cone',0x35553c, 0,3.4*s,0, 1.15*s,5.2*s,1.15*s));
+    g.add(part('cone',0x3e6045, 0,4.3*s,0, .75*s,3.4*s,.75*s));    // lighter inner spire
+    g.children[1].castShadow=true; g.children[2].castShadow=false;
+    g.position.set(x,0,z); windify(g,0.025); decor.add(g); return g;
+  }
+  function makeBlossom(x,z){
+    // a flowering spring bush — dark leafy mound sprinkled with white-pink blossom
+    const g=new THREE.Group(), s=.7+Math.random()*.5;
+    g.add(sph(0x4c7a48, 0,.55*s,0, .95*s,.6*s,.85*s));
+    g.add(sph(0x568a50, .4*s,.75*s,.2*s, .6*s,.4*s,.55*s));
+    const bl=[0xfff4f6,0xffd9e4,0xffe9ee];
+    for(let i=0;i<4;i++){ const a=i*1.7+Math.random();
+      g.add(sph(bl[i%3], Math.cos(a)*.6*s, .7*s+Math.random()*.3*s, Math.sin(a)*.55*s, .17*s)); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.035); decor.add(g); return g;
+  }
+  function makeLily(x,z){
+    // "even Solomon in all his splendor was not dressed like one of these" — a white garden lily
+    const g=new THREE.Group(), h=.6+Math.random()*.3;
+    g.add(part('cylinder',0x4d8a4a, 0,h/2,0, .06,h,.06));
+    for(let p=0;p<5;p++){ const a=p/5*TAU;
+      g.add(part('cone',0xfffaf2, Math.cos(a)*.14, h+.1, Math.sin(a)*.14, .12,.34,.07, .8*Math.cos(a+Math.PI), 0, .8*Math.sin(a))); }
+    g.add(sph(0xffd166, 0,h+.05,0, .07));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); windify(g,0.05); decor.add(g); return g;
+  }
+  function tombScenery(){
+    gtMist = [];
+    const gR=WORLD_R-5, gx=Math.cos(GT_A)*gR, gz=Math.sin(GT_A)*gR;   // must match the tomb placement in startMission
+    // — the rock escarpment the tomb is hewn from: two cliff shoulders flanking a sunrise notch —
+    for(let s=-5;s<=5;s++){
+      if(Math.abs(s)<2) continue;                                     // the notch: dawn pours through, straight past the tomb
+      const a=GT_A+s*0.14, r=WORLD_R+7+Math.abs(s)*1.2, cx=Math.cos(a)*r, cz=Math.sin(a)*r;
+      const h=7+Math.random()*5-Math.abs(s)*0.55, w=7+Math.random()*3;
+      const c=new THREE.Mesh(ugeo('crag'), flatMat(GT_ROCK[(s+5)%4]));
+      c.scale.set(w, h, w*(0.8+Math.random()*.3)); c.position.set(cx, h*0.44, cz);
+      c.rotation.y=Math.random()*TAU; c.rotation.z=(Math.random()-.5)*0.1; c.castShadow=false; c.receiveShadow=true; decor.add(c);
+      const b=new THREE.Mesh(ugeo('boulder'), flatMat(GT_ROCK[(s+6)%4]));                 // rubble at the cliff foot
+      b.scale.set(w*0.5, h*0.22, w*0.4); b.position.set(cx*0.92, h*0.1, cz*0.92);
+      b.rotation.y=Math.random()*TAU; b.castShadow=false; b.receiveShadow=true; decor.add(b);
+    }
+    // — the sunrise itself, framed in the notch directly behind the tomb —
+    const glow=new THREE.Mesh(ugeo('sphere'), gtDawnM);
+    glow.scale.set(34, 13, 2); glow.position.set(Math.cos(GT_A)*(WORLD_R+26), 4.5, Math.sin(GT_A)*(WORLD_R+26)); glow.castShadow=false; decor.add(glow);
+    const disc=new THREE.Mesh(ugeo('sphere'), gtSunM);
+    disc.scale.set(4.6, 4.6, 1); disc.position.set(Math.cos(GT_A)*(WORLD_R+24), 3.4, Math.sin(GT_A)*(WORLD_R+24));
+    disc.rotation.y=GT_A+Math.PI/2; disc.castShadow=false; decor.add(disc);
+    // — three empty crosses on a far hill, small and quiet, off the sunrise's shoulder —
+    const ha=GT_A+0.95, hr=WORLD_R*1.9, hx=Math.cos(ha)*hr, hz=Math.sin(ha)*hr;
+    const hill=new THREE.Mesh(ugeo('sphere'), flatMat(0x5f6a54));
+    hill.scale.set(26,9,20); hill.position.set(hx,-1.2,hz); hill.castShadow=false; decor.add(hill);
+    for(let k=-1;k<=1;k++){
+      const px=hx+Math.cos(ha+Math.PI/2)*k*3.4, pz=hz+Math.sin(ha+Math.PI/2)*k*3.4, py=7.6-Math.abs(k)*0.9;
+      const up=box(.5,3.6,.5, 0x4a3a2c, px,py+1.8,pz), ar=box(2.1,.45,.5, 0x4a3a2c, px,py+2.9,pz);
+      up.rotation.y=ar.rotation.y=ha+Math.PI/2; up.castShadow=ar.castShadow=false; decor.add(up,ar);
+    }
+    // — shafts of first light falling through the garden, widening as they reach the grass —
+    for(let s=0;s<3;s++){
+      const t=0.35+s*0.22, sx=gx*t+(s-1)*6.5, sz=gz*t+(1-s)*5.5;
+      const sh=new THREE.Mesh(ugeo('cone'), gtShaftM);
+      sh.scale.set(2.4+s*.9, 24, 2.4+s*.9); sh.position.set(sx, 8.5, sz);
+      sh.rotation.z=0.30; sh.rotation.x=-0.22; sh.castShadow=false; decor.add(sh);
+    }
+    // — the garden: olives, cypress spires, spring blossom, lilies, dew flowers —
+    const len2=gx*gx+gz*gz, clearOfPath=(x,z)=>{                    // keep the walk to the tomb open
+      const tt=Math.max(0,Math.min(1,(x*gx+z*gz)/len2));
+      return Math.hypot(x-gx*tt, z-gz*tt)>4.5 && Math.hypot(x-gx,z-gz)>6; };
+    let n=0, guard=0;
+    while(n<7 && guard++<70){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6 && clearOfPath(x,z)){ makeOlive(x,z); n++; } }
+    n=0; guard=0;
+    while(n<5 && guard++<50){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7 && clearOfPath(x,z)){ makeCypress(x,z); n++; } }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(2); if(clearOfPath(x,z)) makeBlossom(x,z); }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(1.5); makeLily(x,z); }
+    for(let i=0;i<Math.round(WORLD_R*0.5);i++){ const [x,z]=randPos(1); makeFlower(x,z); }
+    for(let i=0;i<5;i++){ const [x,z]=randPos(2); if(clearOfPath(x,z)) makeRock(x,z,.5+Math.random()*.5); }
+    // — night's last mist, drifting low between the trees (animated in frame()) —
+    for(let m=0;m<9;m++){
+      const p=new THREE.Mesh(ugeo('sphere'), gtMistM);
+      const sx=5+Math.random()*4.5;
+      p.position.set((Math.random()*2-1)*WORLD_R, .7+Math.random()*.9, (Math.random()*2-1)*WORLD_R);
+      p.scale.set(sx, .8+Math.random()*.5, 3+Math.random()*2.5);
+      p.rotation.y=Math.random()*TAU; p.castShadow=false; p.receiveShadow=false;
+      p.userData={ vx:.25+Math.random()*.3, vz:(Math.random()-.5)*.25, ph:Math.random()*TAU, sp:.4+Math.random()*.4, sx };
+      decor.add(p); gtMist.push(p);
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -1661,6 +1792,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       stormScenery();
     } else if(d==='redsea'){
       redseaScenery();
+    } else if(d==='tomb'){
+      tombScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2261,18 +2394,40 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const glow = new THREE.PointLight(0xffe9b0, 1.5, 22); glow.position.set(0,5,-4); g.add(glow);
     return g;
   }
-  function makeTomb(){   // Easter morning — the garden tomb, open and empty, stone rolled away
+  function makeTomb(){   // Easter morning — the garden tomb, hewn from the rock, open and EMPTY.
+    // The doorway itself is the light source: warm radiance spills out of the darkness,
+    // pools on the doorstep, and breathes (pulsed in frame()) — "He is not here; he has risen."
     const g = new THREE.Group();
-    g.add(sph(0x9a9182, 0,1.7,-.6, 2.6,2.2,2.3));                  // smooth rock mound
-    g.add(sph(0x8a8172, -1.5,1.0,-1.0, 1.6,1.4,1.5));
-    g.add(sph(0xa39a8a, 1.5,1.1,-.9, 1.5,1.3,1.4));
-    g.add(sph(0x7e7666, 0,2.9,-1.4, 1.4,1.0,1.3));                 // mossy top
-    const dark = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0x241d14}));
-    dark.position.set(0,1.0,1.45); dark.scale.set(.85,1.05,.35); g.add(dark);   // open doorway — empty inside!
-    g.add(part('cylinder', 0xb8b0a0, 2.5,.95,1.7, .95,.34,.95, Math.PI/2,0,.4)); // the stone, rolled away
-    g.add(sph(0x5ab04f, -1.9,.35,1.4, .8,.5,.7), sph(0x63c258, 2.0,.3,.4, .6,.4,.6)); // garden bushes
-    g.add(sph(0xe8607a, -1.7,.72,1.5, .12), sph(0xffd166, 2.1,.62,.55, .11));         // little flowers
-    const glow = new THREE.PointLight(0xfff0d0, 1.2, 12); glow.position.set(0,1.4,2.2); g.add(glow);
+    g.add(sph(0xb2a68d, 0,2.3,-.8, 3.6,3.0,3.1));                  // the hewn rock mass
+    g.add(sph(0xa1957c, -2.1,1.3,-1.2, 2.2,1.9,2.0));
+    g.add(sph(0xbcb096, 2.1,1.4,-1.1, 2.1,1.8,1.9));
+    g.add(sph(0x7a805f, 0,3.9,-1.7, 2.0,1.2,1.8));                 // moss and grass grown over the top
+    g.add(sph(0x6d7a55, -1.4,3.2,-1.5, 1.2,.7,1.1));
+    // dressed stone door frame — this was a rich man's tomb (Matt 27:57-60)
+    g.add(box(.5,2.6,.45, 0x8d8069, -1.05,1.3,1.35), box(.5,2.6,.45, 0x8d8069, 1.05,1.3,1.35));
+    g.add(box(2.6,.5,.45, 0x968971, 0,2.6,1.35));                  // lintel
+    const dark = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0x1c1610}));
+    dark.position.set(0,1.15,1.42); dark.scale.set(1.05,1.3,.4); g.add(dark);   // the opening — empty inside!
+    const inner = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffe9c4, transparent:true, opacity:.9, fog:false}));
+    inner.position.set(0,1.05,1.62); inner.scale.set(.72,.98,.12); g.add(inner);   // radiance standing IN the doorway
+    const halo = new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffdfae, transparent:true, opacity:.30, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+    halo.position.set(0,1.35,1.5); halo.scale.set(2.5,2.6,.9); halo.castShadow=false; g.add(halo);
+    const spill = new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe2b0, transparent:true, opacity:.20, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+    spill.position.set(0,.35,2.7); spill.scale.set(2.6,.35,2.9); spill.rotation.x=Math.PI; spill.castShadow=false; g.add(spill);   // light pooling down the doorstep
+    g.add(box(3.4,.28,1.7, 0x9a8d76, 0,.14,2.1));                  // the doorstep slab
+    // the great rolling stone, thrown clear along its carved track
+    const stone=part('cylinder', 0xbcb2a0, 3.1,1.05,2.1, 2.1,.55,2.1, Math.PI/2,0,.35);
+    g.add(stone);
+    g.add(part('cylinder', 0xaca188, 3.1,1.05,2.1, 1.1,.60,1.1, Math.PI/2,0,.35)); // worn boss at its center
+    g.add(box(3.0,.16,.7, 0x877a64, 1.8,.1,1.75));                 // the groove it rolled along
+    // the folded linen, left neatly on the ledge just inside (John 20:7)
+    g.add(sph(0xf5f0e4, -.55,.62,1.15, .34,.10,.22), sph(0xefe9da, -.55,.72,1.15, .22,.07,.16));
+    // the garden pressing close around it
+    g.add(sph(0x4c7a48, -2.6,.5,1.8, 1.0,.65,.9), sph(0x568a50, 2.9,.4,.3, .8,.5,.75));
+    g.add(sph(0xfff4f6, -2.4,.95,1.9, .16), sph(0xffd9e4, -2.8,.85,1.5, .13), sph(0xffd166, 3.0,.75,.5, .12));
+    g.traverse(o=>{ if(o.isMesh){ o.receiveShadow=true; } });
+    const glow = new THREE.PointLight(0xffe9c0, 1.6, 15); glow.position.set(0,1.5,2.6); g.add(glow);
+    g.userData.glow=glow; g.userData.halo=halo;                    // frame() makes the light breathe
     return g;
   }
   function makeFish(){   // Jonah's great fish — big & friendly, not scary
@@ -2544,6 +2699,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   // ---- Missions (a journey through the Bible; each has its own biome) ----
   const GREEN = [0x62c257,0x57bd50,0x6bcc5f,0x4fae48];
   const LUSH  = [0x4fb84a,0x57bd50,0x63c95a,0x46ad48];
+  const DEWG  = [0x559e60,0x4c935a,0x63aa68,0x468655];   // dew-cool Easter-dawn garden green (tomb biome)
   const SAND  = [0xe6d3a0,0xdec994,0xecdcac,0xd8c489];
   const NIGHT_G = [0x2f7a3a,0x357f40,0x2a7136,0x316f3a];
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
@@ -2723,7 +2879,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'tomb', name:'The Empty Tomb', emoji:'🌅', type:'reach',
       goal:'Jesus is alive! Walk to the garden tomb and see — the stone is rolled away!',
       verse:'“He is not here; he has risen, just as he said. Come and see the place where he lay.” — Matthew 28:6',
-      env:{ ground:LUSH, water:null, sky:0xf7cfa4, decor:'forest' } },
+      env:{ ground:DEWG, water:null, sky:0xf2b099, fogNear:34, fogFar:88, decor:'tomb' } },
     { id:'pentecost', name:'The Day of Pentecost', emoji:'🔥', type:'collect', base:9, item:'flame',
       goal:'God sent His Holy Spirit like little flames of fire on Jesus’ friends! Gather the bright flames!',
       verse:'“They saw what seemed to be tongues of fire that… came to rest on each of them. All of them were filled with the Holy Spirit.” — Acts 2:3-4',
@@ -2943,9 +3099,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const jacob=makeNPC('jacob'); jacob.position.set(3,0,3); jacob.rotation.y=Math.atan2(gx-3,gz-3); props.add(jacob);
         say('Follow the glow to the stairway from Jacob’s dream! 🪜✨',4200);
       } else if(mission.id==='tomb'){ // Easter morning — walk to the open garden tomb
-        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+        // pinned on the camera diagonal so the doorway sits dead-center in the cliff notch,
+        // silhouetted in its own sunrise (the tomb biome builds the escarpment around GT_A)
+        const R=WORLD_R-5, gx=Math.cos(GT_A)*R, gz=Math.sin(GT_A)*R;
         const tomb=makeTomb(); tomb.position.set(gx,0,gz); tomb.rotation.y=Math.atan2(-gx,-gz); props.add(tomb); missionCtx.goalObj=tomb;
-        const angel=makeNPC('angel'); angel.position.set(gx*0.88,0,gz*0.88); angel.rotation.y=Math.atan2(-gx,-gz); props.add(angel);
+        // the angel sits BESIDE the rolled-away stone (Matt 28:2), leaving the glowing doorway in clear view
+        const px=Math.cos(GT_A+Math.PI/2), pz=Math.sin(GT_A+Math.PI/2);
+        const angel=makeNPC('angel'); angel.position.set(gx*0.90+px*2.6,0,gz*0.90+pz*2.6); angel.rotation.y=Math.atan2(-px,-pz)+2.2; props.add(angel);
         const mary=makeNPC('mary'); mary.position.set(3,0,3); mary.rotation.y=Math.atan2(gx-3,gz-3); props.add(mary);
         say('Jesus is risen! Walk to the empty tomb! 🌅',4200);
       } else if(mission.id==='sinai'){ // walk to God's mountain where Moses received the tablets
@@ -3486,6 +3646,23 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const ty = c<0 ? 0 : Math.PI;                 // nose (at -z) leads the direction of travel
         f.rotation.y += (ty-f.rotation.y)*Math.min(1, dt*5);
         f.rotation.z = Math.sin(T*3.1+d.ph)*0.07;
+      }
+    }
+    // ---- tomb biome: night's last mist drifts through the garden; the doorway light breathes ----
+    if(currentEnv && currentEnv.decor==='tomb'){
+      const lim2=WORLD_R*1.25;
+      for(const p of gtMist){ const d=p.userData;
+        p.position.x += d.vx*dt; p.position.z += d.vz*dt;
+        if(p.position.x> lim2) p.position.x=-lim2;
+        if(p.position.z> lim2) p.position.z=-lim2; else if(p.position.z<-lim2) p.position.z=lim2;
+        const s=1+Math.sin(T*d.sp+d.ph)*0.1;
+        p.scale.x=d.sx*s;                                    // slow billow as it drifts
+      }
+      const tb=missionCtx&&missionCtx.goalObj;
+      if(tb&&tb.userData.glow){
+        const br=1+Math.sin(T*1.4)*0.16+Math.sin(T*3.7)*0.05;   // candle-soft, never strobing
+        tb.userData.glow.intensity=1.6*br;
+        tb.userData.halo.material.opacity=0.30*br;
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
