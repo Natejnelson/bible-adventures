@@ -356,6 +356,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffeed2); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='jericho'){
+      // the seventh day, late afternoon (Joshua 6:15): a low golden sun rakes ACROSS the plain
+      // from the side, so the great rampart wears hard warm light on its courses and every palm
+      // and tent throws a long shadow — while heat haze softens the old tell behind the walls
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe0b98c), 0.34), near||48, far||100);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.2; sun.color.set(0xffd9a0);
+      sun.position.set(34, 18, 8);
+      hemi.color.set(0xead9b8); hemi.groundColor.set(0x9a7c54); hemi.intensity = 0.8;
+      ambLight.color.set(0xffe6c4); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -1923,6 +1935,136 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       a.rotation.y=Math.random()*TAU; a.castShadow=false; decor.add(a); }
   }
 
+  // ---- Jericho, the city of palms (the 'jericho' biome — Joshua 6): the seventh day of the
+  //      march. The whole up-screen horizon IS the city — a battered stone revetment under
+  //      towering mudbrick ramparts, the gate "tightly shut" (Josh 6:1) between twin banner
+  //      towers, Rahab's scarlet cord hanging from her window in the wall (Josh 2:18-21), and
+  //      the old tell rising behind, crowded with rooftops and the great round watchtower.
+  //      On the plain: date palms (Deut 34:3 "the City of Palms"), the trodden ring of the
+  //      marching path circling the walls, and Israel's tents around a smoking cookfire. ----
+  const JC_A = Math.PI*1.32;                       // the shut gate waits up-screen on the camera diagonal
+  const JC_MUD=[0xcaa87a,0xbf9d6e,0xd4b286,0xb69468];   // sun-dried mudbrick courses
+  const JC_STONE=0x9d8b6d;                              // the battered stone revetment at the wall's foot
+  let jcSmoke=[];
+  function jcTent(x,z,ry,cloth,trim){
+    const g=new THREE.Group();
+    g.add(conePart(trim, 0,.50,0, 1.95,1.0));           // contrasting woven band at the skirt
+    g.add(conePart(cloth,0,1.40,0, 1.75,2.8));          // goat-hair canvas
+    g.add(part('cylinder',0x6b4a2b, 0,2.85,0, .05,.5,.05));  // ridge-pole tip
+    g.add(sph(0x3a2c1c, 0,.44,1.18, .30,.40,.10));      // shadowed door flap, facing the fire
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function jcBanner(x,z,baseY,c){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0x6b4a2b, 0,1.15,0, .07,2.3,.07));
+    g.add(part('cylinder',0x6b4a2b, .40,2.08,0, .05,.95,.05, 0,0,Math.PI/2));
+    g.add(box(.85,1.30,.05, c, .44,1.32,0));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,baseY,z); windify(g,.05); decor.add(g); return g;
+  }
+  function jcCampfire(x,z){
+    const g=new THREE.Group();
+    for(let i=0;i<5;i++){ const a=i/5*TAU; const st=new THREE.Mesh(ugeo('blob'), flatMat(0x8d7c62));
+      st.position.set(Math.cos(a)*1.05,.15,Math.sin(a)*1.05); st.scale.set(.52,.34,.44);
+      st.rotation.y=a; st.castShadow=false; st.receiveShadow=true; g.add(st); }
+    g.add(part('cylinder',0x5a4028, 0,.24,0, .13,1.5,.13, Math.PI/2,.5,0));
+    g.add(part('cylinder',0x4c3620, 0,.28,0, .13,1.5,.13, Math.PI/2,-.6,0));
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffa347}));
+    fl.position.y=.85; fl.scale.set(.55,.95,.55); g.add(fl);
+    const core=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe1a0}));
+    core.position.y=.78; core.scale.set(.28,.55,.28); g.add(core);
+    const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffb060, transparent:true, opacity:.25}));
+    halo.position.y=.92; halo.scale.setScalar(1.3); g.add(halo);
+    g.position.set(x,0,z); windify(g,.03); decor.add(g);            // the sway loop = flame flicker
+    const pool=new THREE.Mesh(ugeo('sphere'), fnEmberM);            // firelight pooled on the dust
+    pool.position.set(x,.05,z); pool.scale.set(2.6,.02,2.2); pool.castShadow=false; decor.add(pool);
+    if(!vlSmokeM) vlSmokeM=new THREE.MeshLambertMaterial({color:0xd8d2c8, transparent:true, opacity:.32});
+    for(let i=0;i<5;i++){ const p=new THREE.Mesh(ugeo('sphere'), vlSmokeM); p.castShadow=false;
+      const y0=1.0, top=6.2+Math.random()*1.4;
+      p.userData={x, z, y:y0+Math.random()*(top-y0), y0, top, vy:.5+Math.random()*.3, s0:.32+Math.random()*.14, ph:Math.random()*TAU};
+      p.scale.setScalar(p.userData.s0); decor.add(p); jcSmoke.push(p); }
+  }
+  function jerichoScenery(){
+    jcSmoke=[];
+    const gR=WORLD_R+6.4, gry=-JC_A+Math.PI/2;
+    // — the great rampart: battered stone revetment under high crenellated mudbrick —
+    const st=4.3/gR, NS=Math.max(7, Math.round(gR*0.28));
+    for(let s=-NS;s<=NS;s++){
+      if(Math.abs(s)<=1) continue;                                  // the gatehouse fills the middle
+      const a=JC_A+s*st, wx=Math.cos(a)*gR, wz=Math.sin(a)*gR;
+      const h=6.8+((Math.abs(s)*7)%3)*0.5, ry=-a+Math.PI/2;
+      const base=box(5.2,2.2,2.6, JC_STONE, wx,1.1,wz); base.rotation.y=ry; base.castShadow=false; decor.add(base);
+      const seg=box(5.0,h-2.2,2.0, JC_MUD[(s+NS)%4], wx,(h+2.2)/2,wz); seg.rotation.y=ry; seg.castShadow=false; decor.add(seg);
+      for(let mj=-1;mj<=1;mj++){ const ma=a+mj*(1.35/gR);           // crenellated crown
+        const me=box(1.0,.8,1.9, JC_MUD[(s+mj+NS+1)%4], Math.cos(ma)*gR, h+.4, Math.sin(ma)*gR);
+        me.rotation.y=ry; me.castShadow=false; decor.add(me); }
+    }
+    // — Rahab's window in the wall, the scarlet cord hanging down outside (Josh 2:18-21) —
+    { const ra=JC_A+3.6*st, rr=gR-1.05, rx=Math.cos(ra)*rr, rz=Math.sin(ra)*rr;
+      const win=box(.9,1.1,.3, 0x3a2c1c, rx,4.9,rz); win.rotation.y=-ra+Math.PI/2; win.castShadow=false; decor.add(win);
+      const cord=box(.09,3.3,.07, 0xc23b2e, rx,2.75,rz); cord.rotation.y=-ra+Math.PI/2; cord.castShadow=false; decor.add(cord); }
+    // — the gatehouse: twin towers flanking cedar doors shut tight and barred (Josh 6:1) —
+    const gx=Math.cos(JC_A)*gR, gz=Math.sin(JC_A)*gR;
+    const gate=new THREE.Group(); gate.position.set(gx,0,gz); gate.rotation.y=gry;
+    [-1,1].forEach(sd=>{
+      const tb=part('cylinder', JC_STONE, sd*3.4,1.2,0, 2.35,2.4,2.35); tb.castShadow=false; gate.add(tb);
+      const tw=part('cylinder', JC_MUD[1], sd*3.4,5.2,0, 2.0,8.4,2.0); tw.castShadow=false; gate.add(tw);
+      for(let m=0;m<5;m++){ const ma=m/5*TAU+sd;                     // tower crown merlons
+        const me=box(.8,.7,.8, JC_MUD[(m+1)%4], sd*3.4+Math.cos(ma)*1.75, 9.75, Math.sin(ma)*1.75);
+        me.rotation.y=ma; me.castShadow=false; gate.add(me); }
+    });
+    const lin2=box(4.9,.55,1.9, JC_STONE, 0,5.55,0); lin2.castShadow=false; gate.add(lin2);   // stone lintel
+    const lin=box(4.9,2.6,1.8, JC_MUD[2], 0,7.15,0); lin.castShadow=false; gate.add(lin);     // wall over the doors
+    [-1,1].forEach(sd=>{                                             // the shut doors face the plain (local −z)
+      const dr=box(2.15,5.3,.5, 0x7a5230, sd*1.12,2.65,-.75); dr.castShadow=false; gate.add(dr);
+      [-1,0,1].forEach(k=>{ const pl=box(.14,5.2,.1, 0x64411f, sd*1.12+k*.68,2.65,-1.02); pl.castShadow=false; gate.add(pl); });
+    });
+    const bar=box(4.2,.5,.3, 0x4c3620, 0,2.9,-1.12); bar.castShadow=false; gate.add(bar);     // the great bar
+    [-1.12,1.12].forEach(px=>{ const sd2=sph(0x8a6a3a, px,2.9,-1.3, .16); sd2.castShadow=false; gate.add(sd2); });
+    decor.add(gate);
+    const tx=Math.cos(JC_A+Math.PI/2), tz=Math.sin(JC_A+Math.PI/2);
+    jcBanner(gx+tx*3.4, gz+tz*3.4, 10.15, 0xa03c30);                 // standards over the gate
+    jcBanner(gx-tx*3.4, gz-tz*3.4, 10.15, 0x3f6b8a);
+    // — the old tell rising behind the walls, crowded with rooftops (Jericho sits on a mound) —
+    const cx=Math.cos(JC_A)*(gR+11), cz=Math.sin(JC_A)*(gR+11);
+    const mound=sph(0xc4a678, cx,0,cz, 16,6,13); mound.rotation.y=gry; mound.castShadow=false; mound.receiveShadow=true; decor.add(mound);
+    for(let k=0;k<8;k++){
+      const ha=JC_A+(k-3.5)*0.09, hr=gR+5.5+(k%3)*3.2;
+      const hx=Math.cos(ha)*hr, hz=Math.sin(ha)*hr;
+      const hh=2.4+(k*5)%3, hy=2.2+(k%4)*1.2;
+      const hb=box(2.6,hh,2.4, JC_MUD[(k+1)%4], hx,hy+hh/2,hz);
+      hb.rotation.y=-ha+Math.PI/2+((k%3)-1)*.2; hb.castShadow=false; decor.add(hb);
+      if(k%2===0){ const aw=box(2.7,.16,1.2, [0xa03c30,0x3f6b8a,0x6a3f8f][(k/2)%3|0], hx,hy+hh+.1,hz);
+        aw.rotation.y=hb.rotation.y; aw.castShadow=false; decor.add(aw); }
+    }
+    const twx=Math.cos(JC_A)*(gR+9.5), twz=Math.sin(JC_A)*(gR+9.5);  // the great round watchtower at the crest
+    const tow=part('cylinder', 0xab9878, twx,8.4,twz, 1.7,7.6,1.7); tow.castShadow=false; decor.add(tow);
+    for(let m=0;m<4;m++){ const ma=m/4*TAU+.4;
+      const me=box(.8,.7,.8, JC_MUD[m%4], twx+Math.cos(ma)*1.5, 12.5, twz+Math.sin(ma)*1.5);
+      me.rotation.y=ma; me.castShadow=false; decor.add(me); }
+    // — the trodden marching path circling the wall: six days of footsteps already (Josh 6:14) —
+    const pr=WORLD_R-3.4;
+    for(let i=0;i<16;i++){ const a=JC_A+(i-7.5)*0.17, px2=Math.cos(a)*pr, pz2=Math.sin(a)*pr;
+      const pt=sph(0xe0c496, px2,.045,pz2, 1.5+Math.random()*.5,.05,.95+Math.random()*.3);
+      pt.rotation.y=-a+Math.PI/2; pt.castShadow=false; pt.receiveShadow=true; decor.add(pt); }
+    // — date palms: the City of Palms (Deut 34:3) — a grove at the wall's feet, more on the plain —
+    [-1.0,-.62,-.3,.3,.62,1.0].forEach(da=>{ const a=JC_A+da, r2=gR-2.4;
+      makePalm(Math.cos(a)*r2, Math.sin(a)*r2); });
+    for(let i=0;i<5;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makePalm(x,z); }
+    // — Israel's camp down-screen: goat-hair tents around the cookfire, a standard flying —
+    const ca=JC_A+Math.PI, fx=Math.cos(ca)*(WORLD_R-6.2), fz=Math.sin(ca)*(WORLD_R-6.2);
+    const TENTC=[[0xd9cdb0,0x8a5a3a],[0xc9bda0,0x5e6a8a],[0xd4c6a8,0x9a4f35],[0xccbf9e,0x3f6b5a],[0xd8ccb2,0x6a3f6e]];
+    [[0,2.0],[.40,3.2],[-.38,2.8],[.76,2.1],[-.72,2.3]].forEach((t,i)=>{
+      const a=ca+t[0], x=Math.cos(a)*(WORLD_R-t[1]), z=Math.sin(a)*(WORLD_R-t[1]);
+      jcTent(x,z, Math.atan2(fx-x,fz-z), TENTC[i][0], TENTC[i][1]); });
+    jcCampfire(fx,fz);
+    jcBanner(Math.cos(ca+.18)*(WORLD_R-3.6), Math.sin(ca+.18)*(WORLD_R-3.6), 0, 0x3f6b8a);
+    // — dry-country scrub and stones on the open plain —
+    for(let i=0;i<9;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>5) makeScrub(x,z); }
+    for(let i=0;i<7;i++){ const [x,z]=randPos(2); makeRock(x,z, .55+Math.random()*.6); }
+  }
+
   // ---- Galilee fishing-village decor (the 'village' biome — Matthew 4:18: "as Jesus was
   //      walking beside the Sea of Galilee…"). Capernaum really was built of BLACK BASALT
   //      fieldstone under pale thatch — a strong, true palette — and its whole shoreline was
@@ -2139,6 +2281,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       furnaceScenery();
     } else if(d==='village'){
       villageScenery();
+    } else if(d==='jericho'){
+      jerichoScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2416,6 +2560,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       mary:     {robe:0x4a6fb0, trim:0xe8d9a0, cover:0xdfe6f2, veil:true,      skin:0xe3b48a},
       jesus:    {robe:0xf3f1ec, trim:0xd0463f, cover:0x6b4a2b, beard:0x6b4a2b, halo:true, skin:0xe3b48a},
       daniel:   {robe:0x5f83c4, trim:0x3f5f97, cover:0x2e2016,                 skin:0xdba876},
+      priest:   {robe:0xf1ece0, trim:0xd9ad3f, cover:0xf1ece0, beard:0x4a3a2a, skin:0xdba876},
       adam:     {robe:0xa9784a, trim:0x7c5330, cover:0x2a1c10,                 skin:0xd8a068},
       moses:    {robe:0x9b4a3a, trim:0x6b2f24, cover:0xd8c9a3, beard:0xf0f0ea, staff:true, skin:0xdba876},
       ruth:     {robe:0x7c9a4f, trim:0xe8d9a0, cover:0xc9d6e8, veil:true,      skin:0xdba876},
@@ -3058,6 +3203,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
   const SCORCH =[0x4a3c31,0x413429,0x55453a,0x382d24];   // the plain of Dura — ash-gray earth scorched warm around the kiln (furnace biome)
   const GALIL  =[0x8cab55,0x7f9f4d,0x99b761,0x729449];   // dry summer grass above the Galilee shore (village biome)
+  const JPLAIN =[0xd2b088,0xc7a67c,0xdcbc94,0xb99a70];   // the sun-baked plain of Jericho — dusty rose-tan (jericho biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -3122,7 +3268,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'jericho', name:'The Walls of Jericho', emoji:'📯', type:'collect', base:7, item:'horn',
       goal:'March around Jericho! Gather the trumpets so the priests can sound them!',
       verse:'“When the trumpets sounded… the wall collapsed; so everyone charged straight in, and they took the city.” — Joshua 6:20',
-      env:{ ground:SAND, water:null, sky:0xf4dcb0, fogFar:88, decor:'desert' } },
+      env:{ ground:JPLAIN, water:null, sky:0xf2d2a2, fogNear:48, fogFar:100, decor:'jericho' } },
     { id:'gideon', name:"Gideon's Trumpets", emoji:'🎺', type:'collect', base:8, item:'horn',
       goal:'God helped Gideon with just 300 helpers! Gather trumpets for his brave band in the night!',
       verse:'“The three companies blew the trumpets… they shouted, ‘A sword for the Lord and for Gideon!’” — Judges 7:20',
@@ -3327,15 +3473,20 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       if(mission.id==='ruth'){ const boaz=makeNPC('ruth'); boaz.position.set(3,0,-3); boaz.rotation.y=0.6; props.add(boaz); }
       if(mission.id==='gideon'){ const gd=makeNPC('joshua'); gd.position.set(3,0,-3); gd.rotation.y=2.6; props.add(gd); }
       if(mission.id==='sower'){ const fm=makeNPC('shepherd'); fm.position.set(3,0,3); fm.rotation.y=-2.3; props.add(fm); }
-      if(mission.id==='jericho'){ // the great walled city waits at the edge of the world
-        const wallC=0xc9b490, capC=0xb8a37e, wa=Math.random()*TAU, wR=WORLD_R-3;
-        for(let s=-3;s<=3;s++){ const a=wa+s*0.16, wx=Math.cos(a)*wR, wz=Math.sin(a)*wR;
-          const seg=box(3.2,3.6,1.2,wallC, wx,1.8,wz); seg.rotation.y=-a+Math.PI/2; props.add(seg);
-          if(s%2===0){ const cap=sph(capC, wx,3.8,wz, 1.7,.5,.8); cap.rotation.y=-a+Math.PI/2; cap.castShadow=false; props.add(cap); }
-        }
-        const tw=part('cylinder', wallC, Math.cos(wa)*wR, 2.6, Math.sin(wa)*wR, 2.2,5.2,2.2); props.add(tw); // watchtower
-        const tc=conePart(0xa08a60, Math.cos(wa)*wR, 5.8, Math.sin(wa)*wR, 1.4,1.6); tc.castShadow=false; props.add(tc);
+      if(mission.id==='jericho'){ // the seventh day: the ark already out on the marching path (Josh 6:6-8)
         const josh=makeNPC('joshua'); josh.position.set(3,0,-3); josh.rotation.y=2.6; props.add(josh);
+        const pa=JC_A+0.55, pr2=WORLD_R-3.4, ax=Math.cos(pa)*pr2, az=Math.sin(pa)*pr2;
+        const mdir=Math.atan2(-Math.sin(pa), Math.cos(pa));         // facing on around the city
+        const ark=new THREE.Group();
+        ark.add(box(1.7,.95,1.0, 0xe0b83a, 0,1.05,0));              // the gold chest
+        ark.add(box(1.85,.16,1.15, 0xf2ca62, 0,1.62,0));            // the mercy-seat rim
+        [-.42,.42].forEach(px=>{ const w=sph(0xf2ca62, px,1.98,0, .12,.38,.30);
+          w.rotation.z=px>0?-.5:.5; ark.add(w); });                 // the cherubim's lifted wings
+        [-.62,.62].forEach(pz=>ark.add(part('cylinder',0x8a5a2b, 0,.62,pz, .09,3.6,.09, 0,0,Math.PI/2)));  // carrying poles
+        ark.position.set(ax,0,az); ark.rotation.y=mdir; props.add(ark);
+        [-2.4,2.4].forEach(d=>{ const p2=makeNPC('priest');         // white-robed priests fore and aft
+          p2.position.set(ax+Math.sin(mdir)*d, 0, az+Math.cos(mdir)*d);
+          p2.rotation.y=mdir; props.add(p2); });
       }
       if(mission.id==='abram'){ // Abraham gazes up at the promise-filled sky
         const ab=makeNPC('abraham'); ab.position.set(3,0,3); ab.rotation.y=-2.3; props.add(ab);
@@ -4091,6 +4242,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const gr=(d.y-d.y0)/(d.top-d.y0);
         p.position.set(d.x+Math.sin(T*.55+d.ph)*(.15+gr*1.1)-gr*1.6, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.8)-gr*1.2);
         p.scale.setScalar(d.s0*(.5+gr*1.4));                       // each puff swells and leans inland as it lifts
+      }
+    }
+    // ---- jericho biome: the camp's cookfire smoke climbs and drifts off across the plain ----
+    if(currentEnv && currentEnv.decor==='jericho'){
+      for(const p of jcSmoke){ const d=p.userData;
+        d.y += d.vy*dt; if(d.y>d.top) d.y=d.y0;
+        const gr=(d.y-d.y0)/(d.top-d.y0);
+        p.position.set(d.x+Math.sin(T*.5+d.ph)*(.15+gr*1.0)+gr*2.0, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.8));
+        p.scale.setScalar(d.s0*(.5+gr*1.5));                       // swelling as the evening wind takes it
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
