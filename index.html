@@ -368,6 +368,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffe6c4); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='egypt'){
+      // the seven years of plenty (Genesis 41:49): a rich late-afternoon sun swung well to
+      // the side, so every granary, obelisk and palm rakes a long shadow across the yard,
+      // with gold grain-dust haze lying over the valley — light that says ABUNDANCE,
+      // warmer and heavier than Jericho's dry siege heat
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe8c894), 0.36), near||48, far||102);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.25; sun.color.set(0xffdf9e);
+      sun.position.set(30, 20, 14);
+      hemi.color.set(0xdce8f0); hemi.groundColor.set(0xb08d58); hemi.intensity = 0.8;
+      ambLight.color.set(0xffe8c2); ambLight.intensity = 0.28;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='pasture' && !night){
       // shepherd-country afternoon (Psalm 23): the sun swung low toward the down-screen
       // side so every hedgerow, fold-stone and woolly back wears a golden rim and throws
@@ -461,6 +474,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       case 'boulder':  g = new THREE.IcosahedronGeometry(.5, 1); break; // faceted low-poly rock
       case 'blob':     g = new THREE.IcosahedronGeometry(.5, 0); break; // chunky 20-face blob
       case 'crag':     g = new THREE.ConeGeometry(.5, 1, 6); break; // faceted rock spire / mountain peak
+      case 'pyr4':     g = new THREE.ConeGeometry(.5, 1, 4); break; // true 4-sided pyramid (Egypt / obelisk tip)
       case 'arc':      g = new THREE.TorusGeometry(.5, .05, 6, 24, Math.PI); break; // half-ring, e.g. a rainbow band
       default:         g = new THREE.SphereGeometry(.5, 10, 8);
     }
@@ -654,6 +668,45 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const a=(i+0.5)/6*TAU+Math.random()*0.4; if(roadGap(a)<0.3) continue;
         const rr=WORLD_R*2.9+Math.random()*12;
         mesa(Math.cos(a)*rr, Math.sin(a)*rr, 22+Math.random()*12, 11+Math.random()*6, true);
+      }
+    } else if(env.horizon==='egypt'){
+      // the west bank of the Nile: a staggered Giza-style row of great pyramids rises
+      // up-screen — each turned 45° so one face takes the sun and one holds shadow, the
+      // middle one still wearing its pale limestone casing at the peak — with low dune
+      // bluffs ringing the rest of the horizon and two more pyramids sunk in the gold
+      // haze far behind. When the Nile itself crosses the world, the ring parts for it.
+      const hazeC=new THREE.Color(env.sky||0xf2d8a8);
+      const pyrM =new THREE.MeshLambertMaterial({color:0xd6b27c, flatShading:true});
+      const capM =new THREE.MeshLambertMaterial({color:0xf0e2c0, flatShading:true});
+      const farM =new THREE.MeshLambertMaterial({color:new THREE.Color(0xd0aa74).lerp(hazeC,0.58), flatShading:true});
+      const duneM=new THREE.MeshLambertMaterial({color:0xd8ba84});
+      const EG_H=Math.PI*1.25;                       // camera diagonal — the row faces the player's view
+      const nileGap=a=>{ if(env.water!=='stream') return 9;      // angular distance to the river line (x+z=0)
+        let d=a-Math.PI*0.75; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        let d2=a+Math.PI*0.25; while(d2>Math.PI)d2-=TAU; while(d2<-Math.PI)d2+=TAU;
+        return Math.min(Math.abs(d), Math.abs(d2)); };
+      const pyr=(a,rr,w,h,m,cap)=>{
+        const x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+        const p=new THREE.Mesh(ugeo('pyr4'), m); p.scale.set(w,h,w);
+        p.position.set(x, h/2-1.5, z); p.rotation.y=EG_H+Math.PI/4;   // corner toward camera: lit + shaded face
+        p.castShadow=false; groundGroup.add(p);
+        if(cap){ const c=new THREE.Mesh(ugeo('pyr4'), capM);          // surviving casing crown, set slightly proud
+          c.scale.set(w*0.31, h*0.31, w*0.31); c.position.set(x, h*0.845-1.5, z);
+          c.rotation.y=p.rotation.y; c.castShadow=false; groundGroup.add(c); } };
+      pyr(EG_H-0.24, WORLD_R*2.10, 17, 12, pyrM);                     // the Great Pyramid — kept STEEP and NARROW so
+      pyr(EG_H+0.13, WORLD_R*1.95, 14, 10, pyrM, true);               //  even a frame-clipped base still shows angled
+      pyr(EG_H+0.40, WORLD_R*1.82, 9, 6.5, pyrM);                     //  flanks (the apexes resolve as you walk closer)
+      pyr(EG_H-1.75, WORLD_R*2.85, 15, 9.5, farM);                    // ghosts on the far haze
+      pyr(EG_H+1.95, WORLD_R*2.95, 13, 8.5, farM);
+      for(let i=0;i<10;i++){                                          // low dune bluffs close the ring
+        const a=i/10*TAU+Math.random()*0.3;
+        let d=a-EG_H; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        if(Math.abs(d)<0.62 || nileGap(a)<0.42) continue;             // clear of the row and the river
+        const rr=WORLD_R*2.35+Math.random()*10, w=18+Math.random()*14;
+        const dn=new THREE.Mesh(new THREE.SphereGeometry(1,12,8), duneM);
+        dn.scale.set(w, 3.5+Math.random()*2.6, w*(0.7+Math.random()*0.3));
+        dn.position.set(Math.cos(a)*rr, -1.4, Math.sin(a)*rr);
+        dn.rotation.y=Math.random()*TAU; dn.castShadow=false; groundGroup.add(dn);
       }
     } else if(env.interior){
       // indoors — no horizon at all; the biome's own walls enclose the space
@@ -2587,6 +2640,127 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- Egypt granary-country decor (the 'egypt' biome — Genesis 41:49: "Joseph stored up
+  //      huge quantities of grain, like the sand of the sea"). One glance should say BOTH
+  //      "Egypt" (pyramids on the horizon, obelisks, glyph walls, a guardian sphinx, date
+  //      palms) and "harvest plenty" (fat beehive granaries with grain heaped at their doors). ----
+  const EG_MUD=[0xcfa870,0xc39c66,0xd9b47c];             // sun-dried mud-plaster tints
+  const EG_STONE=0xd6b888, EG_GRAIN=0xe0b45e;            // dressed sandstone / heaped wheat
+  let egGlyphM=null, egBandGeo=null;
+  function egGlyphMat(){                                 // one shared carved-hieroglyph band (cached — clearGroup doesn't dispose)
+    if(egGlyphM) return egGlyphM;
+    const c=document.createElement('canvas'); c.width=256; c.height=64;
+    const q=c.getContext('2d');
+    q.fillStyle='#d6b888'; q.fillRect(0,0,256,64);
+    q.strokeStyle='#8a6234'; q.fillStyle='#8a6234'; q.lineWidth=3; q.lineCap='round';
+    q.beginPath(); q.moveTo(0,4); q.lineTo(256,4); q.moveTo(0,60); q.lineTo(256,60); q.stroke();   // register lines
+    q.beginPath(); q.arc(24,22,9,0,TAU); q.stroke();                     // sun disc
+    q.beginPath(); q.arc(24,22,3,0,TAU); q.fill();
+    q.beginPath(); q.arc(64,18,7,0,TAU); q.stroke();                     // ankh
+    q.beginPath(); q.moveTo(64,25); q.lineTo(64,50); q.moveTo(53,33); q.lineTo(75,33); q.stroke();
+    for(const y of [20,36]){ q.beginPath(); q.moveTo(94,y);              // water ripples
+      for(let i=1;i<=6;i++) q.lineTo(94+i*8, y+(i%2?7:0)); q.stroke(); }
+    q.beginPath(); q.moveTo(158,24); q.quadraticCurveTo(175,8,192,24);   // the watching eye
+    q.quadraticCurveTo(175,34,158,24); q.stroke();
+    q.beginPath(); q.arc(175,23,4,0,TAU); q.fill();
+    q.beginPath(); q.moveTo(175,30); q.lineTo(175,46); q.stroke();
+    q.beginPath(); q.arc(222,26,8,0,TAU); q.stroke();                    // standing ibis
+    q.beginPath(); q.moveTo(229,21); q.quadraticCurveTo(238,10,243,16); q.stroke();
+    q.beginPath(); q.moveTo(218,33); q.lineTo(218,50); q.moveTo(226,33); q.lineTo(226,50); q.stroke();
+    const tx=new THREE.CanvasTexture(c); tx.wrapS=THREE.RepeatWrapping; tx.repeat.set(2,1);
+    egGlyphM=new THREE.MeshLambertMaterial({map:tx});
+    return egGlyphM;
+  }
+  function egWall(x,z,ry,len){
+    // a run of dressed sandstone wall wearing its carved story-band on both faces
+    const g=new THREE.Group();
+    if(!egBandGeo) egBandGeo=new THREE.PlaneGeometry(1,1);
+    g.add(box(len,2.3,0.7,EG_STONE, 0,1.15,0));
+    g.add(box(len*1.05,0.30,0.92,0xc7a668, 0,2.45,0));                   // coping course
+    [0.37,-0.37].forEach(zz=>{ const b=new THREE.Mesh(egBandGeo, egGlyphMat());
+      b.scale.set(len*0.94,0.95,1); b.position.set(0,1.42,zz);
+      if(zz<0) b.rotation.y=Math.PI; b.castShadow=false; g.add(b); });
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function egGranary(x,z,s,ry,big){
+    // a fat beehive grain-store: tapered mud body under a domed cap, roof filling-hatch,
+    // dark arched door at the ground with the harvest spilling golden out of it
+    const g=new THREE.Group();
+    const mud=EG_MUD[Math.floor(Math.random()*3)];
+    const body=part('robe',mud, 0,1.7,0, 3.3,3.4,3.3); g.add(body);
+    g.add(sph(mud, 0,3.42,0, 1.05,0.60,1.05));                           // domed cap
+    g.add(part('cylinder',0xb08d58, 0,3.86,0, .5,.34,.5));               // filling hatch
+    g.add(sph(0x8a6234, 0,4.06,0, .3,.09,.3));                           // hatch lid
+    g.add(sph(0x4a3320, 0,.60,1.52, .40,.58,.16));                       // arched doorway
+    g.add(sph(EG_GRAIN, 0,.26,2.05, .95,.32,.70));                       // grain heaped at the door
+    if(big){ [-0.62,0.62].forEach(px=>g.add(part('cylinder',0x9c6b3a,    // the tally-man's ladder
+        px,2.0,1.32, .09,3.9,.09, -0.32,0,0)));
+      for(let r=0;r<4;r++) g.add(part('cylinder',0x8a5a2b, 0,0.8+r*0.85, 1.71-r*0.27, .07,1.24,.07, 0,0,Math.PI/2)); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    body.castShadow=!!big;                                               // only the yard's biggest store casts (perf)
+    g.scale.multiplyScalar(s||1); g.position.set(x,0,z); g.rotation.y=ry||0; decor.add(g); return g;
+  }
+  function egObelisk(x,z){
+    // a slim sandstone needle on its plinth, crowned with a gilded pyramidion
+    const g=new THREE.Group(), H=6.2;
+    g.add(box(1.5,0.66,1.5,0xc7a668, 0,0.33,0));
+    g.add(box(0.72,H,0.72,EG_STONE, 0,0.66+H/2,0));
+    g.add(part('pyr4',0xf2c14e, 0,0.66+H+0.30,0, 1.02,0.62,1.02, 0,Math.PI/4,0));
+    g.position.set(x,0,z); decor.add(g); return g;
+  }
+  function egSphinx(x,z,ry){
+    // a guardian sphinx couchant on its plinth — lion body at rest, royal headcloth
+    const g=new THREE.Group(), ST=0xd0ae72, DK=0xbb975e;
+    g.add(box(5.6,0.6,2.4,DK, 0,0.3,0));
+    const body=part('capsule',ST, -0.7,1.15,0, 1.15,1.55,1.15, 0,0,Math.PI/2); g.add(body);   // long low body at rest
+    [-0.48,0.48].forEach(zz=>g.add(part('capsule',ST, 1.45,0.80,zz, .38,.85,.38, 0,0,Math.PI/2))); // forepaws stretched ahead
+    g.add(sph(ST, -2.30,1.30,0, .55,.62,.62));                           // rising haunches
+    g.add(part('cylinder',ST, 1.05,1.55,0, .72,1.1,.72));                // chest lifting into the neck
+    g.add(sph(ST, 1.15,2.42,0, .40,.44,.36));                            // head held high over the paws
+    const nm=part('robe',0xc9a25e, 1.10,2.28,0, 1.30,.9,1.34); nm.rotation.z=-0.10; g.add(nm); // flared nemes headcloth
+    g.add(sph(0xc9a25e, 1.12,2.72,0, .34,.16,.36));                      // its flat crown
+    g.add(sph(0x4a3320, 1.50,2.44,-0.14, .05,.06,.035));                 // quiet carved eyes
+    g.add(sph(0x4a3320, 1.50,2.44,0.14, .05,.06,.035));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    body.castShadow=true;
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function egSack(x,z){
+    // a plump tied grain-sack waiting its turn at the store
+    const g=new THREE.Group();
+    g.add(sph(0xc9a25e, 0,.40,0, .40,.42,.36));
+    g.add(part('cylinder',0xa9824a, 0,.82,0, .19,.18,.19));
+    g.add(sph(0x8a6234, 0,.88,0, .13,.05,.13));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function egyptScenery(){
+    const EG_H=Math.PI*1.25, ux=Math.cos(EG_H), uz=Math.sin(EG_H);
+    // — Joseph's granary yard sits up-screen, dead under the pyramids: walking toward the
+    //   harvest wealth IS walking into the postcard —
+    const yd=WORLD_R*0.52, yx=ux*yd, yz=uz*yd;
+    const faceHome=(x,z)=>Math.atan2(-x,-z);             // spin so the door (local +z) faces the spawn
+    [[0,0,1.15,true],[-4.8,2.4,0.95],[2.8,-4.6,1.0],[5.2,2.0,0.78]].forEach(([dx,dz,s,big])=>{
+      egGranary(yx+dx, yz+dz, s, faceHome(yx+dx, yz+dz)+ (Math.random()-.5)*0.3, big); });
+    for(let i=0;i<6;i++) egSack(yx+(Math.random()-.5)*11, yz+(Math.random()-.5)*11);
+    const px=-uz, pz=ux;                                 // unit vector across the yard axis
+    egWall(yx+ux*5.5+px*7.5, yz+uz*5.5+pz*7.5, EG_H, 9);             // story-walls closing the yard's back corners,
+    egWall(yx+ux*5.5-px*7.5, yz+uz*5.5-pz*7.5, EG_H, 9);             //  broadside so their carved bands face the walk in
+    const gd=yd*0.52;                                    // the processional gateway between spawn and yard
+    egObelisk(ux*gd+px*3.8, uz*gd+pz*3.8);
+    egObelisk(ux*gd-px*3.8, uz*gd-pz*3.8);
+    egSphinx(px*13-ux*4, pz*13-uz*4, EG_H+Math.PI*0.42); // the guardian watching the road from the side
+    for(let i=0,n=7+Math.round(WORLD_R*0.1);i<n;i++){    // date palms scattered over the valley floor
+      const [x,z]=randPos(4);
+      if(Math.hypot(x,z)>7 && Math.hypot(x-yx,z-yz)>8) makePalm(x,z);
+    }
+    for(let i=0;i<10;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>5) makeScrub(x,z); }
+    for(let i=0;i<6;i++){ const [x,z]=randPos(2); if(Math.hypot(x-yx,z-yz)>7) makeRock(x,z,.5+Math.random()*.5); }
+    for(let i=0;i<4;i++){ const [x,z]=randPos(3);        // stray heaps where the harvest carts spilled over
+      if(Math.hypot(x,z)>6) { const h=sph(EG_GRAIN, x,.22,z, .7+Math.random()*.4,.26,.55+Math.random()*.35);
+        h.rotation.y=Math.random()*TAU; h.castShadow=false; decor.add(h); } }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -2629,6 +2803,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       pastureScenery();
     } else if(d==='canyon'){
       canyonScenery();
+    } else if(d==='egypt'){
+      egyptScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3567,6 +3743,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const JPLAIN =[0xd2b088,0xc7a67c,0xdcbc94,0xb99a70];   // the sun-baked plain of Jericho — dusty rose-tan (jericho biome)
   const MEADOW =[0x7fb757,0x73ac4d,0x8cc264,0x679d45];   // soft shepherd-country turf, clover-dark in the hollows (pasture biome)
   const CANY   =[0xbb7a50,0xab6b46,0xc8875c,0x99613e];   // iron-red canyon dirt baking under hard light (canyon biome)
+  const KEMET  =[0xdfc188,0xd3b478,0xe9d09a,0xc7a668];   // Nile-valley earth gold with threshing dust — the years of plenty (egypt biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -3591,7 +3768,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'joseph', name:'Joseph Stores the Grain', emoji:'🏺', type:'collect', base:9, item:'grain',
       goal:'Help wise Joseph store up grain in Egypt before the famine comes!',
       verse:'“Joseph stored up huge quantities of grain, like the sand of the sea.” — Genesis 41:49',
-      env:{ ground:FIELD, water:null, sky:0xf4dcb0, fogFar:88, decor:'wheat' } },
+      env:{ ground:KEMET, water:null, sky:0xf2d8a8, fogNear:48, fogFar:102, decor:'egypt', horizon:'egypt' } },
     { id:'sheep', name:'The Lost Sheep', emoji:'🐑', type:'find', base:1,
       goal:'One little lamb is lost. Explore and find it!',
       verse:'“Rejoice with me; I have found my lost sheep.” — Luke 15:6',
@@ -3611,7 +3788,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'basket', name:'Baby Moses in the Basket', emoji:'🧺', type:'reach',
       goal:'Baby Moses is floating in a basket among the reeds! Walk along the river and find him!',
       verse:'“She opened it and saw the baby. He was crying, and she felt sorry for him.” — Exodus 2:6',
-      env:{ ground:SEDGE, water:'stream', waterColor:0x3f9e7e, sky:0xf2d9a8, fogFar:92, decor:'river' } },
+      env:{ ground:SEDGE, water:'stream', waterColor:0x3f9e7e, sky:0xf2d9a8, fogFar:92, decor:'river', horizon:'egypt' } },
     { id:'bush', name:'The Burning Bush', emoji:'🔥', type:'reach',
       goal:'God spoke to Moses from a bush that burned but never burned up! Walk to the glowing bush!',
       verse:'“Moses saw that though the bush was on fire it did not burn up.” — Exodus 3:2',
