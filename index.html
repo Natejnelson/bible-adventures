@@ -381,6 +381,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffe8c2); ambLight.intensity = 0.28;
       return;
     }
+    if(currentEnv && currentEnv.decor==='hilltown'){
+      // a hill-country town at working mid-morning (2 Kings 4, Jeremiah 18, Luke 19): the sun
+      // still climbing over the terraced ridge, so every courtyard wall, olive and drying line
+      // throws a soft shadow down the slope, while warm limestone bounce keeps the shade
+      // honey-colored — neighborly light, busier than the pasture, gentler than Jericho
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe8d8b2), 0.30), near||52, far||104);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.2; sun.color.set(0xffe6b2);
+      sun.position.set(22, 26, 26);
+      hemi.color.set(0xd6e8f2); hemi.groundColor.set(0x9b8a5e); hemi.intensity = 0.85;
+      ambLight.color.set(0xffedd0); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='pasture' && !night){
       // shepherd-country afternoon (Psalm 23): the sun swung low toward the down-screen
       // side so every hedgerow, fold-stone and woolly back wears a golden rim and throws
@@ -707,6 +720,55 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         dn.scale.set(w, 3.5+Math.random()*2.6, w*(0.7+Math.random()*0.3));
         dn.position.set(Math.cos(a)*rr, -1.4, Math.sin(a)*rr);
         dn.rotation.y=Math.random()*TAU; dn.castShadow=false; groundGroup.add(dn);
+      }
+    } else if(env.horizon==='hilltown'){
+      // the hill country of Judah: the UPPER town climbs a low olive-green ridge up-screen —
+      // flat-roofed limestone houses stacked up the shoulder (Bethlehem-scale: a backdrop
+      // band lying just past the play edge, never a green wall), dark cypress flames between
+      // the roofs, a little domed watchtower on the crest — while paler empty ridges roll
+      // off into the haze around the rest of the ring
+      const hazeC=new THREE.Color(env.sky||0xa9d9ef);
+      const hillM=new THREE.MeshLambertMaterial({color:0x99a065});
+      const farHillM=new THREE.MeshLambertMaterial({color:new THREE.Color(0x8a9166).lerp(hazeC,0.52)});
+      const wallMs=[0xd9cdb4,0xcfc0a4,0xc8b795].map(c=>new THREE.MeshLambertMaterial({color:c}));
+      const roofM=new THREE.MeshLambertMaterial({color:0xb9a276});
+      const cypM=new THREE.MeshLambertMaterial({color:0x2f5232});
+      const HT=Math.PI*1.25;
+      const hill=new THREE.Mesh(new THREE.SphereGeometry(1,14,10), hillM);
+      hill.scale.set(WORLD_R*0.9, 8.5, WORLD_R*0.62);
+      hill.position.set(Math.cos(HT)*(WORLD_R*1.55+9), -1.5, Math.sin(HT)*(WORLD_R*1.55+9));
+      hill.rotation.y=-HT+Math.PI/2; hill.castShadow=false; groundGroup.add(hill);
+      const gR=WORLD_R*1.5;
+      for(let k=0;k<11;k++){                                        // the upper town stacked on the shoulder
+        const a=HT+(k-5)*0.078+((k*7)%3-1)*.02, rr=gR+((k*5)%4)*2.8;
+        const hx=Math.cos(a)*rr, hz=Math.sin(a)*rr;
+        const hw=3.0+((k*3)%3)*.6, hh=2.4+((k*7)%4)*.7, hy=((k*5)%4)*1.25;
+        const hb=new THREE.Mesh(boxGeo, wallMs[k%3]);
+        hb.scale.set(hw,hh,2.6); hb.position.set(hx,hy+hh/2,hz);
+        hb.rotation.y=-a+Math.PI/2+((k%3)-1)*.15; hb.castShadow=false; groundGroup.add(hb);
+        const rf=new THREE.Mesh(boxGeo, roofM); rf.scale.set(hw*1.12,hh*0.12,2.8);
+        rf.position.set(hx,hy+hh*1.05,hz); rf.rotation.y=hb.rotation.y; rf.castShadow=false; groundGroup.add(rf);
+        if(k%3===1){ const c=new THREE.Mesh(ugeo('cone'), cypM);    // a cypress flame between the roofs
+          c.scale.set(1.5,6.5,1.5); c.position.set(hx+Math.cos(a+Math.PI/2)*2.3, hy+3.1, hz+Math.sin(a+Math.PI/2)*2.3);
+          c.castShadow=false; groundGroup.add(c); }
+      }
+      { const rr=gR+7, tx=Math.cos(HT)*rr, tz=Math.sin(HT)*rr;      // the domed watchtower on the crest
+        const tw=new THREE.Mesh(new THREE.CylinderGeometry(1,1.15,1,10), wallMs[0]);
+        tw.scale.set(1.7,6.6,1.7); tw.position.set(tx,7.4,tz); tw.castShadow=false; groundGroup.add(tw);
+        const td=new THREE.Mesh(new THREE.SphereGeometry(1,10,8), roofM);
+        td.scale.set(1.9,1.3,1.9); td.position.set(tx,11.0,tz); td.castShadow=false; groundGroup.add(td); }
+      for(let i=0;i<9;i++){                                         // empty ridges closing the ring, safely far out
+        const a=i/9*TAU+Math.random()*0.3; let d=a-HT; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        if(Math.abs(d)<0.72) continue;
+        const rr=WORLD_R*(2.35+Math.random()*0.6), w=15+Math.random()*12;
+        const rg=new THREE.Mesh(new THREE.SphereGeometry(1,12,8), Math.random()<0.4?hillM:farHillM);
+        rg.scale.set(w, 4+Math.random()*3.5, w*(0.75+Math.random()*0.3));
+        rg.position.set(Math.cos(a)*rr, -2, Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
+        rg.castShadow=false; groundGroup.add(rg);
+        if(i===2||i===6){ for(let k=0;k<3;k++){                     // a tiny neighbor village on two far ridges
+          const nb=new THREE.Mesh(boxGeo, wallMs[k%3]);
+          nb.scale.set(2.6,1.8,2.2); nb.position.set(rg.position.x+(k-1)*3.2, rg.scale.y-2.8, rg.position.z+(k%2)*2.4);
+          nb.rotation.y=Math.random(); nb.castShadow=false; groundGroup.add(nb); } }
       }
     } else if(env.interior){
       // indoors — no horizon at all; the biome's own walls enclose the space
@@ -2761,6 +2823,119 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         h.rotation.y=Math.random()*TAU; h.castShadow=false; decor.add(h); } }
   }
 
+  // ---- Hill-town courtyard decor (the 'hilltown' biome — the widow's borrowed jars (2 Kings 4),
+  //      the potter at his wheel (Jeremiah 18), Zacchaeus' street in Jericho (Luke 19) and the
+  //      wise builder's storm (Matthew 7)): a lived-in terrace-town yard — flat-roofed limestone
+  //      houses shouldering the down-screen arcs with outdoor stone stairs, dry-stone walls
+  //      stitching the gaps, gnarled silver olives and dark cypress flames, washing strung out
+  //      to dry, a dovecote, a well — while the rest of the town climbs the ridge up-screen. ----
+  const HT_A = Math.PI*1.25;                       // the open hillside (and every reach-goal) waits up-screen
+  const HT_STONE=[0xb3a88e,0xa89d82,0xbfb49a];     // field-stone for the terrace walls
+  function htWall(x,z,ry,len){
+    const g=new THREE.Group(), n=Math.max(3,Math.round(len/1.1));
+    for(let i=0;i<n;i++){
+      const t=(i+0.5)/n*len - len/2;
+      for(let c=0;c<2;c++){
+        const st=part('boulder',HT_STONE[(i+c)%3], t+(Math.random()-.5)*.22, .26+c*.40, (Math.random()-.5)*.2, 1.15,.60,.88);
+        st.rotation.y=Math.random()*TAU; st.castShadow=false; g.add(st);
+      }
+    }
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function htOlive(x,z){
+    const g=new THREE.Group(), s=.8+Math.random()*.5, ln=(Math.random()<.5?-1:1)*(.16+Math.random()*.2);
+    g.add(part('robe',0x7a6242, 0,1.0*s,0, .85*s,2.0*s,.7*s, 0,0,ln));                 // squat leaning bole
+    g.add(part('cylinder',0x6d573a, .55*s,2.0*s,.1*s, .16*s,1.3*s,.16*s, 0,0,-.7));    // two gnarled arms...
+    g.add(part('cylinder',0x6d573a, -.5*s,2.1*s,-.1*s, .14*s,1.1*s,.14*s, .15,0,.75));
+    const SIL=[0x8fa06a,0x7d9158,0x99a874];
+    g.add(sph(SIL[0], .15*s,2.9*s,0, 1.35*s,.95*s,1.25*s));                            // ...under a silver-green crown
+    g.add(sph(SIL[1], 1.0*s,2.6*s,.3*s, .85*s,.65*s,.8*s));
+    g.add(sph(SIL[2], -.9*s,2.7*s,-.2*s, .8*s,.6*s,.75*s));
+    g.add(sph(SIL[1], 0,3.5*s,-.1*s, .8*s,.55*s,.75*s));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.025); decor.add(g); return g;
+  }
+  function htCypress(x,z){
+    const g=new THREE.Group(), s=.85+Math.random()*.45;
+    g.add(part('cylinder',0x6d573a, 0,.5*s,0, .18*s,1.0*s,.18*s));
+    g.add(part('cone',0x2c4f33, 0,3.4*s,0, 1.5*s,5.2*s,1.5*s));                        // the tall dark flame
+    g.add(part('cone',0x33583a, 0,5.6*s,0, .9*s,2.6*s,.9*s));                          // stacked tip
+    g.add(sph(0x3a6040, 0,1.6*s,0, .8*s,.7*s,.8*s));                                   // full skirt at the base
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.035); decor.add(g); return g;
+  }
+  function htStair(x,z,ry){                        // the classic outdoor stair up to a flat roof
+    const g=new THREE.Group();
+    for(let i=0;i<5;i++){ const st=box(1.15,.34,.72,0xc4b596, 0,.17+i*.34,-i*.62); st.castShadow=(i>2); g.add(st); }
+    g.position.set(x,0,z); g.rotation.y=ry; decor.add(g); return g;
+  }
+  function htLaundry(x,z,ry,L){                    // washing strung between two poles, catching the breeze
+    const g=new THREE.Group();
+    [-L/2,L/2].forEach(t=>g.add(part('cylinder',0x8a6a42, t,1.15,0, .09,2.3,.09)));
+    g.add(part('cylinder',0x6a5a44, 0,2.18,0, .035,L,.035, 0,0,Math.PI/2));
+    const CL=[0xc95f4e,0x5d88b8,0x8ca35c,0xd9b34a,0xe8e2d2];
+    for(let i=0,n=3+(Math.random()*2|0);i<n;i++){
+      const t=-L/2+(i+0.9)*(L/(n+0.8)), w=.7+Math.random()*.5;
+      const cl=box(w,1.0+Math.random()*.4,.06, CL[(Math.random()*CL.length)|0], t,1.62,0);
+      cl.rotation.x=.08+Math.random()*.12; g.add(cl);
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.02); decor.add(g); return g;
+  }
+  function htDove(parent,x,y,z){
+    const d=new THREE.Group();
+    d.add(sph(0xf2efe6, 0,.14,0, .16,.13,.20));
+    d.add(sph(0xf2efe6, 0,.30,.14, .09,.09,.09));
+    d.add(conePart(0xd9a35a, 0,.30,.24, .03,.09, Math.PI/2));
+    d.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    d.position.set(x,y,z); d.rotation.y=Math.random()*TAU; parent.add(d); return d;
+  }
+  function htDovecote(x,z,withDoves){
+    const g=new THREE.Group();
+    g.add(part('cylinder',0xd3c6aa, 0,1.9,0, 2.1,3.8,2.1));                            // round plastered tower
+    g.add(part('cone',0xb0714b, 0,4.35,0, 2.5,1.5,2.5));                               // tiled cap
+    for(let r=0;r<2;r++) for(let i=0;i<5;i++){ const a=i/5*TAU+r*.6;                   // nesting holes
+      const h=sph(0x4a3c2c, Math.cos(a)*1.02,2.4+r*.8,Math.sin(a)*1.02, .11,.13,.06);
+      h.castShadow=false; g.add(h); }
+    if(withDoves){ htDove(g,.9,4.0,.6); htDove(g,-.8,4.05,-.5); }
+    g.position.set(x,0,z); decor.add(g); return g;
+  }
+  function hilltownScenery(){
+    const W=WORLD_R, B=W+2.4, storm=!!(currentEnv&&currentEnv.storm);
+    // the lower town flanks the walk up-screen: houses shoulder the two visible arcs just
+    // past the movement clamp, every doorway facing in toward the yard, with a clear gap
+    // held open on the camera diagonal so the upper town on its ridge (and every mission
+    // goal walking toward it) owns the vista — two more houses close the street behind you
+    const angs=[2.62,3.0,3.38,4.5,4.88,5.26,0.9,5.9];
+    angs.forEach((a,i)=>{
+      const hx=Math.cos(a)*B, hz=Math.sin(a)*B;
+      makeHouse(hx,hz, Math.atan2(-hx,-hz));
+      if(i%3===0) htStair(Math.cos(a+0.17)*(B-1.3), Math.sin(a+0.17)*(B-1.3), Math.atan2(-hx,-hz)+.9);
+    });
+    [[2.62,3.0],[3.0,3.38],[4.5,4.88],[4.88,5.26]].forEach(([a1,a2])=>{  // dry-stone walls stitch the near gaps
+      const a=(a1+a2)/2, hx=Math.cos(a)*(B-0.7), hz=Math.sin(a)*(B-0.7);
+      htWall(hx,hz, -a-Math.PI/2, 6);
+    });
+    [[3.2,W*0.60,7],[4.62,W*0.62,6]].forEach(([a,r,L])=>htWall(Math.cos(a)*r, Math.sin(a)*r, -a-Math.PI/2, L));
+    for(let i=0,n=7;i<n;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) htOlive(x,z); }
+    [[2.8,B-0.9],[3.25,B-1.1],[4.42,B-0.8],[5.05,B-1.0],[0.6,B-1.2]].forEach(([a,r])=>htCypress(Math.cos(a)*r,Math.sin(a)*r));
+    if(!storm){                                                          // nobody leaves the washing out in a squall
+      htLaundry(Math.cos(2.81)*(B-2.7), Math.sin(2.81)*(B-2.7), -2.81-Math.PI/2, 3.4);
+      htLaundry(Math.cos(4.69)*(B-2.5), Math.sin(4.69)*(B-2.5), -4.69-Math.PI/2, 3.0);
+    }
+    htDovecote(Math.cos(2.45)*(B-1.1), Math.sin(2.45)*(B-1.1), !storm);
+    makeWell(Math.cos(3.32)*W*0.48, Math.sin(3.32)*W*0.48);
+    for(let i=0;i<4;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>5) makeJarCluster(x,z); }
+    for(let i=0;i<5;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>4) makePotOlive(x,z); }
+    const ux=Math.cos(HT_A), uz=Math.sin(HT_A);
+    for(let i=0;i<8;i++){ const d=4+i*2.6;                               // a loose flagstone path leads up-screen
+      const fs=sph([0xc8baa0,0xbcae92][i%2], ux*d+(Math.random()-.5)*1.3,.04,uz*d+(Math.random()-.5)*1.3, .55,.05,.45);
+      fs.rotation.y=Math.random()*TAU; fs.castShadow=false; decor.add(fs); }
+    for(let i=0;i<8;i++){ const [x,z]=randPos(2);                        // worn paving scattered about the yard
+      const fs=sph(HT_STONE[i%3], x,.04,z, .5+Math.random()*.3,.05,.4+Math.random()*.28);
+      fs.rotation.y=Math.random()*TAU; fs.castShadow=false; decor.add(fs); }
+    for(let i=0;i<4;i++){ const [x,z]=randPos(2); makeRock(x,z,.45+Math.random()*.4); }
+    for(let i=0;i<9;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) makeFlower(x,z); }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -2805,6 +2980,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       canyonScenery();
     } else if(d==='egypt'){
       egyptScenery();
+    } else if(d==='hilltown'){
+      hilltownScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3744,6 +3921,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const MEADOW =[0x7fb757,0x73ac4d,0x8cc264,0x679d45];   // soft shepherd-country turf, clover-dark in the hollows (pasture biome)
   const CANY   =[0xbb7a50,0xab6b46,0xc8875c,0x99613e];   // iron-red canyon dirt baking under hard light (canyon biome)
   const KEMET  =[0xdfc188,0xd3b478,0xe9d09a,0xc7a668];   // Nile-valley earth gold with threshing dust — the years of plenty (egypt biome)
+  const TERRA  =[0xcabb8e,0xbfae7f,0xd6c79c,0xa4a370];   // swept hill-town courtyard earth with sage tufts in the shade (hilltown biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -3832,7 +4010,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'oiljars', name:"The Widow's Oil Jars", emoji:'🏺', type:'collect', base:8, item:'jar',
       goal:'God filled every jar the widow could bring with oil! Help her gather the empty jars!',
       verse:'“Go around and ask all your neighbors for empty jars. Don’t ask for just a few.” — 2 Kings 4:3',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:TERRA, water:null, sky:0xa9d9ef, fogFar:104, decor:'hilltown', horizon:'hilltown' } },
     { id:'nehemiah', name:'Nehemiah Builds the Wall', emoji:'🧱', type:'collect', base:9, item:'stone',
       goal:'Help Nehemiah gather stones to rebuild the wall of Jerusalem!',
       verse:'“So we rebuilt the wall… for the people worked with all their heart.” — Nehemiah 4:6',
@@ -3848,7 +4026,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'potter', name:'The Potter’s House', emoji:'⚱️', type:'collect', base:8, item:'clay',
       goal:'God shapes us with love, just like a potter shapes soft clay! Gather lumps of clay for the potter’s wheel!',
       verse:'“Like clay in the hand of the potter, so are you in my hand, Israel.” — Jeremiah 18:6',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:TERRA, water:null, sky:0xf3cf9e, fogFar:100, decor:'hilltown', horizon:'hilltown' } },
     { id:'furnace', name:'The Fiery Furnace', emoji:'🔥', type:'reach',
       goal:'Shadrach, Meshach and Abednego trusted God, and He kept them safe in the fire! Walk to the furnace and see the fourth man walking with them!',
       verse:'“He said, ‘Look! I see four men walking around in the fire, unbound and unharmed, and the fourth looks like a son of the gods.’” — Daniel 3:25',
@@ -3892,7 +4070,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'builders', name:'The Wise Builder', emoji:'🏠', type:'reach',
       goal:'The storm came, but the wise man’s house stood strong! Walk to the house built on the rock!',
       verse:'“…like a wise man who built his house on the rock. The rain came down… yet it did not fall, because it had its foundation on the rock.” — Matthew 7:24-25',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:TERRA, water:null, sky:0x5b6874, fogNear:34, fogFar:78, decor:'hilltown', horizon:'hilltown', storm:true } },
     { id:'walkwater', name:'Jesus Walks on Water', emoji:'🌊', type:'reach',
       goal:'Keep your eyes on Jesus and walk across the water to Him!',
       verse:'“Take courage! It is I. Don’t be afraid.” — Matthew 14:27',
@@ -3904,7 +4082,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'zacchaeus', name:'Zacchaeus Meets Jesus', emoji:'🌳', type:'reach',
       goal:'Little Zacchaeus climbed a tree to see Jesus! Walk to the big sycamore tree!',
       verse:'“Zacchaeus, come down immediately. I must stay at your house today.” — Luke 19:5',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:TERRA, water:null, sky:0x9fd8ff, decor:'hilltown', horizon:'hilltown' } },
     { id:'palmsunday', name:'Palm Sunday', emoji:'🌴', type:'collect', base:8, item:'palm',
       goal:'Gather palm branches to welcome Jesus the King!',
       verse:'“Hosanna! Blessed is he who comes in the name of the Lord!” — Matthew 21:9',
