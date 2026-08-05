@@ -380,6 +380,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xfff0d4); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='canyon'){
+      // the lonely wilderness road (Jericho, Gaza, Damascus): one hard warm sun swung well to
+      // the side, so every mesa, hoodoo and acacia rakes a long shadow ACROSS the road — hard
+      // desert light with a red bounce off the rock, and a band of warm dust-haze on the horizon
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe8c096), 0.40), near||46, far||104);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.3; sun.color.set(0xffe3ae);
+      sun.position.set(34, 26, 4);
+      hemi.color.set(0xcfe0ec); hemi.groundColor.set(0xa86f48); hemi.intensity = 0.78;
+      ambLight.color.set(0xffdfc0); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -544,6 +556,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         else if(rp > RS_W-3.6){ const wet=(rp-(RS_W-3.6))/2.9;                            // still-wet band at the wall feet
           cA.lerp(cB.copy(cA).multiplyScalar(0.58), wet*wet*0.85); }
       }
+      if(env.decor==='canyon'){                                    // the packed-dirt road, in ground tint:
+        const rp = Math.abs((x-z)*0.7071);                         // it runs up-screen along the camera diagonal
+        if(rp < 3.4){ const t=1-rp/3.4;                            // pale sun-bleached roadway, soft dusty edges
+          cA.lerp(CY_ROAD, Math.min(1, t*1.8)*0.85); }
+        else if(rp < 5.2) cA.lerp(cB.copy(cA).multiplyScalar(0.86), (1-(rp-3.4)/1.8)*0.6); // trodden verge
+      }
       cols[v*3]=cA.r; cols[v*3+1]=cA.g; cols[v*3+2]=cA.b;
     }
     gGeo.setAttribute('color', new THREE.BufferAttribute(cols,3));
@@ -600,6 +618,42 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const p=new THREE.Mesh(ugeo('crag'), farM);
         p.scale.set(w,h,w); p.position.set(Math.cos(a)*rr, h/2-3, Math.sin(a)*rr);
         p.rotation.y=Math.random()*TAU; p.castShadow=false; groundGroup.add(p);
+      }
+    } else if(env.horizon==='canyon'){
+      // red-rock canyon country: banded flat-topped mesas ring the plain — every butte is
+      // stacked sandstone strata under a pale caprock — with a taller hazed rim ghosting
+      // behind, and the ring broken where the road runs so the journey reads as passing
+      // THROUGH the canyon, not circling inside a bowl. Two gateway buttes flank the gap.
+      const hazeC=new THREE.Color(env.sky||0x9ecbe8);
+      const stratM=[new THREE.MeshLambertMaterial({color:0x8a4f34, flatShading:true}),
+                    new THREE.MeshLambertMaterial({color:0xa96243, flatShading:true}),
+                    new THREE.MeshLambertMaterial({color:0xc17a50, flatShading:true})];
+      const capM =new THREE.MeshLambertMaterial({color:0xdaa878, flatShading:true});
+      const farM =new THREE.MeshLambertMaterial({color:new THREE.Color(0xb2765a).lerp(hazeC,0.55), flatShading:true});
+      const roadGap=a=>{ let d=a-CY_A; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        let d2=a-(CY_A+Math.PI); while(d2>Math.PI)d2-=TAU; while(d2<-Math.PI)d2+=TAU;
+        return Math.min(Math.abs(d), Math.abs(d2)); };
+      const mesa=(x,z,w,h,far)=>{ let y=-2;         // TABLE-land: always much wider than tall,
+        for(let k=0;k<3;k++){                        // stepped strata bands, each set well in
+          const bw=w*(1-k*0.16), bh=h*(k===2?0.24:0.38);
+          const c=new THREE.Mesh(ugeo('cylinder'), far?farM:stratM[k%3]);
+          c.scale.set(bw, bh, bw*(0.74+((k*7)%3)*0.12)); c.position.set(x, y+bh/2, z);
+          c.rotation.y=((k*5)%6)*0.5; c.castShadow=false; groundGroup.add(c); y+=bh; }
+        const cp=new THREE.Mesh(ugeo('cylinder'), far?farM:capM);   // the pale caprock table
+        cp.scale.set(w*0.74, h*0.11, w*0.60); cp.position.set(x, y+h*0.055, z);
+        cp.rotation.y=0.4; cp.castShadow=false; groundGroup.add(cp); };
+      for(let i=0;i<9;i++){                          // the near ring
+        const a=i/9*TAU+Math.random()*0.35; if(roadGap(a)<0.42) continue;
+        const rr=WORLD_R*1.9+Math.random()*10;
+        mesa(Math.cos(a)*rr, Math.sin(a)*rr, 14+Math.random()*8, 7+Math.random()*4, false);
+      }
+      [-0.5,0.5].forEach(da=>{                       // the gateway buttes framing the road up-screen
+        const a=CY_A+da, rr=WORLD_R*1.75;
+        mesa(Math.cos(a)*rr, Math.sin(a)*rr, 12+Math.random()*3, 9+Math.random()*2, false); });
+      for(let i=0;i<6;i++){                          // the far rim, sunk into warm haze
+        const a=(i+0.5)/6*TAU+Math.random()*0.4; if(roadGap(a)<0.3) continue;
+        const rr=WORLD_R*2.9+Math.random()*12;
+        mesa(Math.cos(a)*rr, Math.sin(a)*rr, 22+Math.random()*12, 11+Math.random()*6, true);
       }
     } else if(env.interior){
       // indoors — no horizon at all; the biome's own walls enclose the space
@@ -2432,6 +2486,107 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- Wilderness canyon road (the 'canyon' biome — the lonely roads of Scripture: the
+  //      Jericho road of Luke 10, the desert road to Gaza of Acts 8, the Damascus road of
+  //      Acts 9). One packed-dirt road runs straight up-screen through red-rock country:
+  //      banded mesas on the horizon, tilted outcrops and balanced hoodoo stones in the
+  //      field, flat-topped acacias for shade, waymark cairns pacing the verges, and a
+  //      pair of hawks riding the thermals overhead — so "walk to the goal" reads as a
+  //      real journey down a real road, not a stroll across an empty sand disc. ----
+  const CY_A = Math.PI*1.25;                       // the road runs up-screen along the camera diagonal
+  const CY_ROAD = new THREE.Color(0xdcb587);       // sun-bleached packed dust
+  const CY_ROCK=[0xb26847,0xa25c3e,0xc0754f,0x8f5236];   // iron-red canyon sandstone
+  let cyHawks=[];
+  function cyOnRoad(x,z,m){ return Math.abs(x-z)*0.7071 < (m||3.4); }   // keep the roadway itself clear
+  function cyOutcrop(x,z,s){
+    // a tilted red-rock outcrop: clustered leaning spires with a fallen slab at the base
+    const g=new THREE.Group();
+    const n=2+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){
+      const c=new THREE.Mesh(ugeo('crag'), flatMat(CY_ROCK[Math.floor(Math.random()*4)]));
+      const h=1.5+Math.random()*1.7, w=.9+Math.random()*.9;
+      c.scale.set(w, h, w*(0.7+Math.random()*.5));
+      c.position.set((Math.random()-.5)*1.6, h*0.46, (Math.random()-.5)*1.6);
+      c.rotation.set((Math.random()-.5)*.24, Math.random()*TAU, (Math.random()-.5)*.24);
+      c.castShadow = i===0; c.receiveShadow=true; g.add(c);   // only the tallest spire casts (perf)
+    }
+    const sl=new THREE.Mesh(ugeo('blob'), flatMat(CY_ROCK[Math.floor(Math.random()*4)]));
+    sl.scale.set(1.2+Math.random()*.6, .5, .9+Math.random()*.5);
+    sl.position.set((Math.random()-.5)*1.9, .2, (Math.random()-.5)*1.9);
+    sl.rotation.y=Math.random()*TAU; sl.castShadow=false; sl.receiveShadow=true; g.add(sl);
+    g.scale.multiplyScalar(s||1); g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function cyHoodoo(x,z){
+    // a balanced-rock hoodoo: boulders stacked ever smaller under a broad pale caprock —
+    // the silhouette that says "canyon country" from clear across the world
+    const g=new THREE.Group(); let y=0;
+    [.95+Math.random()*.4, .72+Math.random()*.3, .55+Math.random()*.25].forEach((h,i)=>{
+      const b=new THREE.Mesh(ugeo('boulder'), flatMat(CY_ROCK[(i*2+1)%4]));
+      const w=(1.55-i*.36)*(0.9+Math.random()*.3);
+      b.scale.set(w, h, w*(.85+Math.random()*.2)); y+=h*.44;
+      b.position.set((Math.random()-.5)*.16, y, (Math.random()-.5)*.16);
+      b.rotation.y=Math.random()*TAU; b.castShadow=i===0; b.receiveShadow=true; g.add(b); y+=h*.38;
+    });
+    const cap=new THREE.Mesh(ugeo('blob'), flatMat(0xd19d6c));
+    cap.scale.set(1.15,.4,1.0); cap.position.y=y+.14; cap.rotation.y=Math.random()*TAU;
+    cap.castShadow=false; g.add(cap);
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function cyAcacia(x,z){
+    // the lone flat-topped thorn acacia — a parasol of shade held over the burning road
+    const g=new THREE.Group();
+    const s=.8+Math.random()*.5, lean=(Math.random()-.5)*.4, AG=[0x5d7a3a,0x668540,0x547136];
+    g.add(part('robe',0x6e5236, lean*1.4,1.5*s,0, .40*s,3.0*s,.40*s, 0,0,lean));
+    g.add(part('cylinder',0x6e5236, lean*2.6+.8*s,2.9*s,.2*s, .13*s,1.3*s,.13*s, 0,0,-.9)); // forked limbs
+    g.add(part('cylinder',0x6e5236, lean*2.6-.8*s,2.9*s,-.2*s, .13*s,1.3*s,.13*s, 0,0,.9));
+    g.add(sph(AG[0], lean*2.8, 3.6*s, 0, 2.3*s,.34*s,2.0*s));      // the wide flat crown
+    g.add(sph(AG[1], lean*2.8+1.0*s, 3.45*s, .5*s, 1.3*s,.24*s,1.1*s));
+    g.add(sph(AG[2], lean*2.8-1.1*s, 3.5*s, -.4*s, 1.2*s,.22*s,1.0*s));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.015); decor.add(g); return g;
+  }
+  function cyCairn(x,z){
+    // a traveler's waymark cairn pacing the verge — stones stacked to point on down the road
+    const g=new THREE.Group(); let y=0;
+    for(let i=0;i<3;i++){ const w=.62-i*.16, h=.34-i*.06;
+      const b=new THREE.Mesh(ugeo('blob'), flatMat([0xcbb692,0xbfa884,0xd6c29e][i]));
+      b.scale.set(w, h, w*.9); y+=h*.42; b.position.set((Math.random()-.5)*.08, y, (Math.random()-.5)*.08);
+      b.rotation.y=Math.random()*TAU; b.castShadow=false; b.receiveShadow=true; g.add(b); y+=h*.36; }
+    g.position.set(x,0,z); decor.add(g); return g;
+  }
+  function cyHawk(){
+    // a hawk riding the thermals — spread wings, fanned tail, banked into its slow circle
+    const g=new THREE.Group(), C=0x6b4a2f;
+    g.add(sph(C, 0,0,0, .34,.16,.16));                             // body, nose +x
+    g.add(sph(0x553a24, .34,.03,0, .11,.09,.09));                  // head
+    g.add(sph(0xe8dcc4, -.34,0,0, .22,.04,.18));                   // pale fanned tail
+    g.add(sph(C, 0,.02,-.62, .16,.035,.56));                       // wings held stiff in the glide
+    g.add(sph(C, 0,.02,.62, .16,.035,.56));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    decor.add(g); return g;
+  }
+  function canyonScenery(){
+    cyHawks=[];
+    const ux=Math.cos(CY_A), uz=Math.sin(CY_A);            // unit vector up the road
+    for(let i=0;i<6;i++){                                  // cairns pace BOTH verges, staggered
+      const u=-WORLD_R*0.8 + i*(WORLD_R*1.6/5), side=(i%2?1:-1);
+      cyCairn(ux*u - uz*side*4.4, uz*u + ux*side*4.4);
+    }
+    const off=(m,c,r0)=>{ for(let t=0;t<9;t++){ const [x,z]=randPos(m);   // retry until clear of the road
+      if(!cyOnRoad(x,z,c) && Math.hypot(x,z)>r0) return [x,z]; } return null; };
+    for(let i=0,n=Math.round(WORLD_R*0.34);i<n;i++){ const p=off(3,4.4,7); if(p) cyOutcrop(p[0],p[1], .8+Math.random()*.7); }
+    for(let i=0;i<4;i++){ const p=off(4,4.6,9); if(p) cyHoodoo(p[0],p[1]); }
+    for(let i=0;i<6;i++){ const p=off(4,4.2,8); if(p) cyAcacia(p[0],p[1]); }
+    for(let i=0,n=Math.round(WORLD_R*0.55);i<n;i++){ const p=off(1.5,3.6,4); if(p) makeScrub(p[0],p[1]); }
+    for(let i=0;i<14;i++){ const [x,z]=randPos(1);         // rust scree & road-edge gravel
+      const pb=sph(CY_ROCK[i%4], x,.05,z, .28+Math.random()*.28,.07,.24+Math.random()*.22);
+      pb.rotation.y=Math.random()*TAU; pb.castShadow=false; decor.add(pb); }
+    for(let i=0;i<2;i++){                                  // two hawks turning on the heat
+      const h=cyHawk();
+      cyHawks.push({ o:h, a:Math.random()*TAU, sp:.14+Math.random()*.05, r:11+i*6,
+        y:12+i*3, ph:Math.random()*TAU });
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -2472,6 +2627,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       jerichoScenery();
     } else if(d==='pasture'){
       pastureScenery();
+    } else if(d==='canyon'){
+      canyonScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3409,6 +3566,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const GALIL  =[0x8cab55,0x7f9f4d,0x99b761,0x729449];   // dry summer grass above the Galilee shore (village biome)
   const JPLAIN =[0xd2b088,0xc7a67c,0xdcbc94,0xb99a70];   // the sun-baked plain of Jericho — dusty rose-tan (jericho biome)
   const MEADOW =[0x7fb757,0x73ac4d,0x8cc264,0x679d45];   // soft shepherd-country turf, clover-dark in the hollows (pasture biome)
+  const CANY   =[0xbb7a50,0xab6b46,0xc8875c,0x99613e];   // iron-red canyon dirt baking under hard light (canyon biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -3565,7 +3723,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'samaritan', name:'The Good Samaritan', emoji:'💗', type:'reach',
       goal:'A hurt traveler needs help on the lonely road! Be a kind neighbor — walk to him!',
       verse:'“‘The one who had mercy on him.’ Jesus told him, ‘Go and do likewise.’” — Luke 10:37',
-      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
+      env:{ ground:CANY, water:null, sky:0xeec9a0, fogNear:46, fogFar:104, decor:'canyon', horizon:'canyon' } },
     { id:'zacchaeus', name:'Zacchaeus Meets Jesus', emoji:'🌳', type:'reach',
       goal:'Little Zacchaeus climbed a tree to see Jesus! Walk to the big sycamore tree!',
       verse:'“Zacchaeus, come down immediately. I must stay at your house today.” — Luke 19:5',
@@ -3585,11 +3743,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'ethiopian', name:'Philip & the Chariot', emoji:'📜', type:'reach',
       goal:'A traveler from far-away Ethiopia is reading God’s Word in his chariot — and needs a helper! Run to the chariot like Philip and share the good news about Jesus!',
       verse:'“Then Philip began with that very passage of Scripture and told him the good news about Jesus.” — Acts 8:35',
-      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
+      env:{ ground:CANY, water:null, sky:0xa6d2ec, fogNear:46, fogFar:104, decor:'canyon', horizon:'canyon' } },
     { id:'damascus', name:'The Road to Damascus', emoji:'💫', type:'reach',
       goal:'A bright light from heaven changed Saul into Paul, God’s helper! Walk to the shining light on the road!',
       verse:'“As he neared Damascus on his journey, suddenly a light from heaven flashed around him.” — Acts 9:3',
-      env:{ ground:SAND, water:null, sky:0xdcc3a4, fogFar:84, decor:'desert' } },
+      env:{ ground:CANY, water:null, sky:0xa6d2ec, fogNear:46, fogFar:104, decor:'canyon', horizon:'canyon' } },
     { id:'lydia', name:'Lydia by the River', emoji:'🧵', type:'collect', base:8, item:'cloth',
       goal:'By the river, Lydia the cloth seller heard about Jesus and believed! Help her gather her beautiful purple cloths!',
       verse:'“One of those listening was a woman… named Lydia, a dealer in purple cloth… The Lord opened her heart to respond to Paul’s message.” — Acts 16:14',
@@ -3854,9 +4012,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const bx=(Math.random()*2-1)*(WORLD_R*0.4), bz=WORLD_R*0.62;
         const boat=makeStormBoat(); boat.position.set(bx,0,bz); boat.rotation.y=Math.atan2(-bx,-bz); props.add(boat); missionCtx.goalObj=boat;
         say('Jesus said “Quiet! Be still!” — walk out to the boat! ⛵',4200);
-      } else if(mission.id==='samaritan'){ // the hurt traveler waits along the lonely desert road
-        const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
-        const trav=makeNPC('traveler'); trav.position.set(gx,0,gz); trav.rotation.y=ang+Math.PI; props.add(trav); missionCtx.goalObj=trav;
+      } else if(mission.id==='samaritan'){ // the hurt traveler lies where the road meets the canyon gateway
+        const R=WORLD_R-4, gx=Math.cos(CY_A)*R, gz=Math.sin(CY_A)*R;
+        const trav=makeNPC('traveler'); trav.position.set(gx,0,gz); trav.rotation.y=CY_A+Math.PI; props.add(trav); missionCtx.goalObj=trav;
         for(let s=1;s<6;s++){ const ms=sph(0xcbb692, gx*s/6+Math.sin(s*2.1)*1.6, .28, gz*s/6+Math.cos(s*1.7)*1.6, .34,.24,.30);
           ms.castShadow=false; props.add(ms); }   // dusty milestones mark the Jericho road
         const sam=makeNPC('samaritan'); sam.position.set(3,0,3); sam.rotation.y=Math.atan2(gx-3,gz-3); props.add(sam);
@@ -3907,8 +4065,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         dove.position.set(gx,5.0,gz); dove.rotation.y=Math.atan2(-gx,-gz); props.add(dove);
         const shine=new THREE.PointLight(0xfff2c8,1.1,14); shine.position.set(gx,5.4,gz); props.add(shine);
         say('God said: This is my Son, whom I love! Walk to Jesus at the river! 🕊️',4200);
-      } else if(mission.id==='damascus'){ // the light from heaven on the road to Damascus
-        const R=WORLD_R-6, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+      } else if(mission.id==='damascus'){ // the light from heaven falls dead-center on the Damascus road
+        const R=WORLD_R-6, gx=Math.cos(CY_A)*R, gz=Math.sin(CY_A)*R;
         const lg=new THREE.Group(); lg.position.set(gx,0,gz);
         const beam=new THREE.Mesh(ugeo('cylinder'), new THREE.MeshBasicMaterial({color:0xfff2c0, transparent:true, opacity:.5}));
         beam.scale.set(2.6,11,2.6); beam.position.y=5.5; beam.castShadow=false; lg.add(beam);   // shaft of heavenly light
@@ -3918,8 +4076,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const lt=new THREE.PointLight(0xfff2c8,1.2,20); lt.position.set(gx,4,gz); props.add(lt);
         const saul=makeNPC('paul'); saul.position.set(gx*0.85,0,gz*0.85); saul.rotation.y=Math.atan2(gx,gz); props.add(saul); // Saul stopped still on the road
         say('A light from heaven changed Saul into Paul, God’s helper! Walk to the shining light! 💫',4200);
-      } else if(mission.id==='ethiopian'){ // the Ethiopian official reads God's Word in his stopped chariot
-        const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
+      } else if(mission.id==='ethiopian'){ // the chariot stands stopped side-on across the Gaza road
+        const R=WORLD_R-5, gx=Math.cos(CY_A)*R, gz=Math.sin(CY_A)*R;
         const ch=new THREE.Group(); ch.position.set(gx,0,gz); ch.rotation.y=Math.atan2(-gx,-gz)+Math.PI/2;   // stopped side-on across the road
         ch.add(box(2.6,1.1,1.6,0xa5642f, 0,1.35,0));                              // polished wooden cab
         ch.add(box(2.9,.25,1.9,0x7a4b22, 0,.85,0));                               // floor beam
@@ -4468,6 +4626,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const gr=(d.y-d.y0)/(d.top-d.y0);
         p.position.set(d.x+Math.sin(T*.5+d.ph)*(.15+gr*.9)+gr*1.4, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.7)+gr*1.0);
         p.scale.setScalar(d.s0*(.5+gr*1.5));                       // thinning off downwind toward the town
+      }
+    }
+    // ---- canyon biome: the hawks wheel on the thermals, banked into their slow circles ----
+    if(currentEnv && currentEnv.decor==='canyon' && cyHawks.length){
+      for(const h of cyHawks){
+        h.a += dt*h.sp;
+        h.o.position.set(Math.cos(h.a)*h.r, h.y + Math.sin(T*.4+h.ph)*0.9, Math.sin(h.a)*h.r);
+        h.o.rotation.y = -h.a - Math.PI/2;                         // nose along the circle's tangent
+        h.o.rotation.x = 0.16;                                     // banked into the turn
+        h.o.rotation.z = Math.sin(T*.9+h.ph)*0.06;                 // riding the lift
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
