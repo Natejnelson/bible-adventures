@@ -394,6 +394,35 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffedd0); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='eden'){
+      // the garden God planted (Genesis 2) — one paradise, three dresses:
+      // dawn: the world's FIRST morning (creation) — a barely-risen rose-gold sun up-screen,
+      //       mist still lying on the meadow, every shadow long and gentle
+      // gold: orchard harvest light (the fruit of the Spirit) — honeyed sun swung to the side
+      //       so every laden tree rakes its shadow across the rows
+      // else: high paradise noon — crystal air and deep green bounce; the freshest light in the game
+      if(currentEnv.dawn){
+        scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xf0c49a), 0.36), near||40, far||92);
+        sun.intensity = 1.2; sun.color.set(0xffcf95);
+        sun.position.set(-26, 15, -30);            // long first-light shadows reach back toward the camera
+        hemi.color.set(0xf2d4b4); hemi.groundColor.set(0x55803f); hemi.intensity = 0.85;
+        ambLight.color.set(0xffe3c0); ambLight.intensity = 0.30;
+      } else if(currentEnv.gold){
+        scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe9d8a8), 0.30), near||50, far||102);
+        sun.intensity = 1.25; sun.color.set(0xffe0a6);
+        sun.position.set(30, 22, 20);
+        hemi.color.set(0xdcecd8); hemi.groundColor.set(0x5e9040); hemi.intensity = 0.88;
+        ambLight.color.set(0xffefcf); ambLight.intensity = 0.26;
+      } else {
+        scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xd2eede), 0.28), near||56, far||110);
+        sun.intensity = 1.3; sun.color.set(0xfff4d2);
+        sun.position.set(26, 50, 16);
+        hemi.color.set(0xd4f0ff); hemi.groundColor.set(0x3f8f42); hemi.intensity = 0.95;
+        ambLight.color.set(0xf2ffe8); ambLight.intensity = 0.22;
+      }
+      starField.visible = false; clouds.visible = true;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='pasture' && !night){
       // shepherd-country afternoon (Psalm 23): the sun swung low toward the down-screen
       // side so every hedgerow, fold-stone and woolly back wears a golden rim and throws
@@ -769,6 +798,72 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
           const nb=new THREE.Mesh(boxGeo, wallMs[k%3]);
           nb.scale.set(2.6,1.8,2.2); nb.position.set(rg.position.x+(k-1)*3.2, rg.scale.y-2.8, rg.position.z+(k%2)*2.4);
           nb.rotation.y=Math.random(); nb.castShadow=false; groundGroup.add(nb); } }
+      }
+    } else if(env.horizon==='eden'){
+      // paradise ring: rain-green hills wearing an unbroken forest canopy — clustered crown
+      // bumps of deep jungle green with a flowering treetop caught here and there — parting
+      // up the camera diagonal where "a river watering the garden flowed from Eden"
+      // (Genesis 2:10): twin forested headlands frame a white waterfall threading down a
+      // hazed bluff into its own mist, one colossal ancient tree keeps watch beside the gap,
+      // and paler empty ridges sink into the light behind everything
+      const hazeC=new THREE.Color(env.sky||0x8fd8f0);
+      const hillM=new THREE.MeshLambertMaterial({color:0x4a9a4a});
+      const canMs=[0x2e8a40,0x3a9a48,0x2f7e3c,0x54b054].map(c=>new THREE.MeshLambertMaterial({color:c}));
+      const bloM =new THREE.MeshLambertMaterial({color:0xefb6d2});
+      const farM =new THREE.MeshLambertMaterial({color:new THREE.Color(0x5e9a62).lerp(hazeC,0.55)});
+      const bluffM=new THREE.MeshLambertMaterial({color:new THREE.Color(0x47904c).lerp(hazeC,0.14)});
+      const EA=Math.PI*1.25, sphG=new THREE.SphereGeometry(1,12,8);
+      // crowns crowd the SUMMIT so every hill reads as forest canopy, not a blank green dome
+      const crown=(hx,hz,hy,w)=>{ const n=4+Math.floor(Math.random()*2);
+        for(let k=0;k<n;k++){ const m=new THREE.Mesh(sphG, Math.random()<0.08?bloM:canMs[(k*3)%4]);
+          const cw=w*(0.24+Math.random()*0.14);
+          m.scale.set(cw, cw*0.78, cw); m.position.set(hx+(Math.random()-.5)*w*1.1, hy+(Math.random()-.3)*1.2, hz+(Math.random()-.5)*w*0.8);
+          m.castShadow=false; groundGroup.add(m); } };
+      for(let i=0;i<10;i++){                         // the ring of forested hills — a low backdrop band,
+        const a=i/10*TAU+Math.random()*0.3;          // kept well out so it never walls in the play area
+        let d=a-EA; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        if(Math.abs(d)<0.52) continue;               // the river gap stays open up-screen
+        const rr=WORLD_R*2.15+Math.random()*8, w=13+Math.random()*7, h=3.6+Math.random()*2.2;
+        const hx=Math.cos(a)*rr, hz=Math.sin(a)*rr;
+        const hm=new THREE.Mesh(sphG, hillM); hm.scale.set(w,h,w*(0.8+Math.random()*0.25));
+        hm.position.set(hx,-1.6,hz); hm.rotation.y=Math.random()*TAU; hm.castShadow=false; groundGroup.add(hm);
+        crown(hx,hz, h-2.2+Math.random(), w);
+      }
+      [[EA-0.42,2.0],[EA+0.42,2.06]].forEach(([a,rf])=>{  // twin headlands framing the falls
+        const rr=WORLD_R*rf, hx=Math.cos(a)*rr, hz=Math.sin(a)*rr;
+        const hm=new THREE.Mesh(sphG, hillM); hm.scale.set(12,5.5,10);
+        hm.position.set(hx,-1.6,hz); hm.castShadow=false; groundGroup.add(hm);
+        crown(hx,hz,3.4,12);
+      });
+      { const rr=WORLD_R*2.45, fx=Math.cos(EA)*rr, fz=Math.sin(EA)*rr;  // the falls themselves
+        const bluff=new THREE.Mesh(sphG, bluffM); bluff.scale.set(19,11,9);
+        bluff.position.set(fx,-2,fz); bluff.castShadow=false; groundGroup.add(bluff);
+        crown(fx,fz,7.6,15);                         // the bluff wears its own canopy crest
+        const fwM=new THREE.MeshLambertMaterial({color:0xeafbff});
+        const fw=new THREE.Mesh(boxGeo, fwM); fw.scale.set(4.0,8.6,1.3);
+        // the white ribbon hangs on the bluff's NEAR face (inside-sphere placement swallows it)
+        const fw2c=1-9.6/rr;                         // pull ~9.6 units toward the garden
+        fw.position.set(fx*fw2c,2.6,fz*fw2c); fw.rotation.y=Math.atan2(-fx,-fz); fw.castShadow=false; groundGroup.add(fw);
+        const rb=new THREE.Mesh(boxGeo, fwM); rb.scale.set(2.2,1.4,4.5); // the bright ribbon spilling toward the garden
+        rb.position.set(fx*0.82,-0.4,fz*0.82); rb.rotation.y=fw.rotation.y; rb.castShadow=false; groundGroup.add(rb);
+        const mistM=new THREE.MeshLambertMaterial({color:0xf4fcff, transparent:true, opacity:0.55});
+        [[0,-0.2,4.5],[1.8,0.4,3.2],[-1.7,0.2,3.4]].forEach(([ox,oy,mw])=>{
+          const ms=new THREE.Mesh(sphG, mistM); ms.scale.set(mw,1.5,mw*0.8);
+          ms.position.set(fx*0.85+ox, oy, fz*0.85+ox*0.4); ms.castShadow=false; groundGroup.add(ms); });
+        const tx=Math.cos(EA+0.60)*WORLD_R*1.85, tz=Math.sin(EA+0.60)*WORLD_R*1.85;  // the ancient tree
+        const tkM=new THREE.MeshLambertMaterial({color:0x6d4726});
+        const tk=new THREE.Mesh(ugeo('robe'), tkM); tk.scale.set(3.4,13,3.4);
+        tk.position.set(tx,4.9,tz); tk.castShadow=false; groundGroup.add(tk);
+        [[0,13.4,0,6.4],[3.4,11.8,1.2,4.4],[-3.2,12.2,-1,4.8],[0.6,15.6,0.4,4.2]].forEach(([ox,oy,oz,cw],k)=>{
+          const cn=new THREE.Mesh(sphG, canMs[k%4]); cn.scale.set(cw,cw*0.72,cw);
+          cn.position.set(tx+ox,oy,tz+oz); cn.castShadow=false; groundGroup.add(cn); }); }
+      for(let i=0;i<7;i++){                          // far empty ridges sunk into the haze
+        const a=(i+0.5)/7*TAU+Math.random()*0.35; let d=a-EA; while(d>Math.PI)d-=TAU; while(d<-Math.PI)d+=TAU;
+        if(Math.abs(d)<0.4) continue;
+        const rr=WORLD_R*2.8+Math.random()*10, w=18+Math.random()*12;
+        const rg=new THREE.Mesh(sphG, farM); rg.scale.set(w, 5+Math.random()*4, w*0.8);
+        rg.position.set(Math.cos(a)*rr, -2, Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
+        rg.castShadow=false; groundGroup.add(rg);
       }
     } else if(env.interior){
       // indoors — no horizon at all; the biome's own walls enclose the space
@@ -2936,6 +3031,109 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     for(let i=0;i<9;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) makeFlower(x,z); }
   }
 
+  // ---- GARDEN OF EDEN (the 'eden' biome — Genesis 2; also the orchard of Galatians 5):
+  //      the garden God planted, and the game's opening impression. Grand fruit-hung trees
+  //      over a fern understory, flowering crowns, lily pads and reeds at the water, blossom
+  //      petals drifting down through the air — and in its 'dawn' dress (creation) the
+  //      world's very first morning, mist still lying knee-deep on the meadow. ----
+  let edPetals=[], edMist=[];
+  const ED_CANOPY=[0x2e9440,0x3aa64c,0x46b455,0x2f8a3e,0x55c05c];
+  const ED_BLOOM =[0xf2aacb,0xf9c6dd,0xffdfec];
+  const ED_FRUIT =[0xffb43a,0xe8543a,0xd9455f];
+  function edTree(x,z,kind){               // kind: 'fruit' | 'bloom' | undefined (wild canopy giant)
+    const g=new THREE.Group(), s=1.05+Math.random()*0.55;
+    const bark=kind==='bloom'?0x9a7a58:[0x7d5127,0x8a5a2b][Math.floor(Math.random()*2)];
+    const H=3.8*s;
+    g.add(part('robe',bark, 0,H*0.5,0, 0.62*s,H,0.62*s, 0,0,0.05));
+    g.add(part('robe',bark, 0.36*s,H*0.86,0.1*s, 0.34*s,H*0.55,0.34*s, 0,0,0.5));  // a leaning bough
+    const cy=H+0.8*s, pal=kind==='bloom'?ED_BLOOM:ED_CANOPY;
+    const tint=()=>pal[Math.floor(Math.random()*pal.length)];
+    g.add(sph(tint(), 0,cy,0, 2.1*s));
+    g.add(sph(tint(), 1.35*s,cy-0.3*s,0.25*s, 1.4*s));
+    g.add(sph(tint(), -1.15*s,cy-0.15*s,-0.4*s, 1.5*s));
+    g.add(sph(tint(), 0.2*s,cy+1.05*s,0.1*s, 1.25*s));
+    g.add(sph(tint(), -0.25*s,cy-0.1*s,1.2*s, 1.25*s));
+    if(kind==='fruit') for(let i=0;i<6;i++){          // ripe fruit hanging low in the canopy's skirt
+      const a=i/6*TAU+Math.random()*0.5;
+      const fr=sph(ED_FRUIT[i%3], Math.cos(a)*(1.4*s+Math.random()*0.5), cy-1.2*s-Math.random()*0.4*s,
+                   Math.sin(a)*(1.3*s+Math.random()*0.5), 0.17*s);
+      fr.castShadow=false; g.add(fr); }
+    if(kind==='bloom') g.add(sph(0x3aa64c, 0,cy-1.5*s,0, 1.7*s,0.5*s,1.7*s));      // leafy under-skirt so the blossom crown floats on green
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.028); decor.add(g); return g;
+  }
+  function edFern(x,z){                    // understory fern — a whorl of upswept fronds
+    const g=new THREE.Group(), s=0.7+Math.random()*0.5;
+    const col=[0x2e8a44,0x35984c,0x27793a][Math.floor(Math.random()*3)];
+    for(let i=0;i<6;i++){ const p=pivotAt(0,0.18*s,0); p.rotation.y=i*TAU/6+Math.random()*0.4;
+      const fr=sph(col, 0.75*s,0.34*s,0, 0.85*s,0.09*s,0.24*s); fr.rotation.z=0.55; p.add(fr); g.add(p); }
+    g.add(sph(col,0,0.2*s,0, 0.3*s,0.22*s,0.3*s));
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });  // small + numerous: no shadow cost
+    g.position.set(x,0,z); windify(g,0.06); decor.add(g); return g;
+  }
+  function edLily(x,z){                    // lily pad riding just above the water surface
+    const g=new THREE.Group();
+    const pad=sph(0x3f9e58, 0,0,0, .52,.035,.47); pad.castShadow=false; g.add(pad);
+    if(Math.random()<0.6){ const bl=sph(0xffdfec, 0.15,0.09,0.1, .13,.10,.13); bl.castShadow=false; g.add(bl);
+      const ct=sph(0xffe08a, 0.15,0.17,0.1, .05); ct.castShadow=false; g.add(ct); }
+    g.position.set(x,0.16,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function edReeds(x,z){                   // a stand of reeds at the waterline, two gone to cattail
+    const g=new THREE.Group();
+    for(let i=0;i<4;i++){ const h=0.9+Math.random()*0.7, rx=(Math.random()-.5)*0.5, rz=(Math.random()-.5)*0.5;
+      g.add(part('capsule',0x3e8a46, rx,h/2,rz, .07,h*0.5,.07, 0,0,(Math.random()-.5)*0.2));
+      if(i<2) g.add(sph(0x8a5a2b, rx,h+0.14,rz, .06,.16,.06)); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); windify(g,0.07); decor.add(g); return g;
+  }
+  function edenScenery(){
+    edPetals=[]; edMist=[];
+    const W=WORLD_R, dawn=!!(currentEnv&&currentEnv.dawn), grove=!!(currentEnv&&currentEnv.grove);
+    const w=waterInfo;
+    if(grove){
+      // the orchard: loose offset rows of fruit-heavy trees, the way a keeper would plant them
+      for(let rx=-1;rx<=1;rx++) for(let rz=-2;rz<=1;rz++){
+        const x=rx*9+(rz%2?4.5:0)+(Math.random()-.5)*2.4, z=rz*8+4+(Math.random()-.5)*2.4;
+        if(Math.hypot(x,z)<7||Math.abs(x)>W-4||Math.abs(z)>W-4||inWater(x,z)) continue;
+        edTree(x,z,'fruit');
+      }
+      for(let i=0;i<3;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) edTree(x,z,'bloom'); }
+    } else {
+      for(let i=0,n=Math.round(W*0.30);i<n;i++){ const [x,z]=randPos(3);
+        if(Math.hypot(x,z)>6.5) edTree(x,z, Math.random()<0.45?'fruit':undefined); }
+      for(let i=0;i<4;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) edTree(x,z,'bloom'); }
+    }
+    for(let i=0,n=Math.round(W*0.32);i<n;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>4.5) edFern(x,z); }
+    for(let i=0,n=Math.round(W*1.15);i<n;i++){ const [x,z]=randPos(1); if(Math.hypot(x,z)>3.5) makeFlower(x,z); }
+    for(let i=0;i<4;i++){ const [x,z]=randPos(2); makeRock(x,z,.4+Math.random()*.5); }
+    if(w&&w.mode==='lake'){
+      for(let i=0;i<7;i++){ const a=Math.random()*TAU, r=w.pondR-1.6-Math.random()*2.2;
+        edLily(w.pondX+Math.cos(a)*r, w.pondZ+Math.sin(a)*r); }
+      for(let i=0;i<8;i++){ const a=Math.random()*TAU, r=w.pondR+1.3+Math.random()*0.9;
+        const x=w.pondX+Math.cos(a)*r, z=w.pondZ+Math.sin(a)*r;
+        if(Math.abs(x)<W-1&&Math.abs(z)<W-1&&!inWater(x,z)) edReeds(x,z); }
+    }
+    // blossom petals adrift on the air — the garden stays alive even when the player stands still
+    const petM=new THREE.MeshBasicMaterial({color:0xf4bcd4});
+    for(let i=0;i<14;i++){
+      const p=new THREE.Mesh(ugeo('sphere'), petM); p.scale.set(.22,.05,.16);
+      const [x,z]=randPos(2);
+      p.userData={x, z, top:5.5+Math.random()*2, y:0.4+Math.random()*6,
+                  vy:-(0.5+Math.random()*0.45), ph:Math.random()*TAU, wa:0.6+Math.random()*0.5};
+      p.castShadow=false; p.position.set(x,p.userData.y,z); decor.add(p); edPetals.push(p);
+    }
+    if(dawn){
+      // the first morning's mist, drifting knee-deep across the meadow (creation only)
+      const mm=new THREE.MeshBasicMaterial({color:0xfff0dc, transparent:true, opacity:0.13, depthWrite:false});
+      for(let i=0;i<5;i++){
+        const p=new THREE.Mesh(ugeo('sphere'), mm), sx=8+Math.random()*5;
+        p.scale.set(sx,0.55,sx*0.5);
+        p.position.set((Math.random()*2-1)*W*0.9, 1.0, (Math.random()*2-1)*W*0.9);
+        p.userData={vx:0.35+Math.random()*0.3, vz:(Math.random()-.5)*0.2, sx, sp:0.3+Math.random()*0.3, ph:Math.random()*TAU};
+        p.castShadow=false; p.renderOrder=2; decor.add(p); edMist.push(p);
+      }
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -2982,6 +3180,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       egyptScenery();
     } else if(d==='hilltown'){
       hilltownScenery();
+    } else if(d==='eden'){
+      edenScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3922,15 +4122,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const CANY   =[0xbb7a50,0xab6b46,0xc8875c,0x99613e];   // iron-red canyon dirt baking under hard light (canyon biome)
   const KEMET  =[0xdfc188,0xd3b478,0xe9d09a,0xc7a668];   // Nile-valley earth gold with threshing dust — the years of plenty (egypt biome)
   const TERRA  =[0xcabb8e,0xbfae7f,0xd6c79c,0xa4a370];   // swept hill-town courtyard earth with sage tufts in the shade (hilltown biome)
+  const EDENG  =[0x46b452,0x3ca24a,0x58c25e,0x2f9440];   // rain-fresh paradise green, deeper and richer than any field since (eden biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
       verse:'“And God said, ‘Let there be light,’ and there was light.” — Genesis 1:3',
-      env:{ ground:LUSH, water:'lake', sky:0xf7cfa4, decor:'forest' } },
+      env:{ ground:EDENG, water:'lake', waterColor:0x3e9ec2, sky:0xf7cfa4, fogNear:42, fogFar:94, decor:'eden', horizon:'eden', dawn:true } },
     { id:'eden', name:'Garden of Eden', emoji:'🦁', type:'gather', base:6, reachLabel:'Adam 🧔',
       goal:'Gather the animals so Adam can name them!',
       verse:'“Whatever the man called each living creature, that was its name.” — Genesis 2:19',
-      env:{ ground:LUSH, water:'lake', sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:EDENG, water:'lake', waterColor:0x2fb0c4, sky:0x8fd8f0, fogFar:106, decor:'eden', horizon:'eden' } },
     { id:'noah', name:"Noah's Ark", emoji:'🐘', type:'gather', base:6, reachLabel:'the ark ⛵',
       goal:'Round up the animals and lead them to the ark!',
       verse:'“Two of every kind… will come to you to be kept alive.” — Genesis 6:20',
@@ -4118,7 +4319,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'fruit', name:'Fruit of the Spirit', emoji:'🍎', type:'collect', base:9, item:'fruit',
       goal:'God’s Spirit grows good things in you — love, joy and peace! Gather the sweet orchard fruit!',
       verse:'“But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.” — Galatians 5:22-23',
-      env:{ ground:LUSH, water:'lake', sky:0x9fd8ff, decor:'forest' } },
+      env:{ ground:EDENG, water:'lake', waterColor:0x3aa8b8, sky:0xf3d9a6, fogFar:100, decor:'eden', horizon:'eden', gold:true, grove:true } },
     { id:'heavencity', name:'The Shining City', emoji:'🌟', type:'reach',
       goal:'One day God’s golden city will shine forever — it needs no sun! Walk to the city of God!',
       verse:'“The city does not need the sun or the moon to shine on it, for the glory of God gives it light, and the Lamb is its lamp.” — Revelation 21:23',
@@ -4897,6 +5098,22 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const ty = c<0 ? 0 : Math.PI;                 // nose (at -z) leads the direction of travel
         f.rotation.y += (ty-f.rotation.y)*Math.min(1, dt*5);
         f.rotation.z = Math.sin(T*3.1+d.ph)*0.07;
+      }
+    }
+    // ---- eden biome: blossom petals flutter down; on creation's first morning the mist drifts ----
+    if(currentEnv && currentEnv.decor==='eden'){
+      for(const p of edPetals){ const d=p.userData;
+        d.y += d.vy*dt;
+        if(d.y<0.12){ d.y=d.top; d.x=(Math.random()*2-1)*(WORLD_R-2); d.z=(Math.random()*2-1)*(WORLD_R-2); }
+        p.position.set(d.x+Math.sin(T*0.9+d.ph)*d.wa, d.y, d.z+Math.cos(T*0.7+d.ph)*d.wa*0.6);
+        p.rotation.set(Math.sin(T*1.3+d.ph)*0.6, d.ph+T*0.4, Math.cos(T*1.1+d.ph)*0.5);
+      }
+      const edLim=WORLD_R*1.1;
+      for(const p of edMist){ const d=p.userData;
+        p.position.x += d.vx*dt; p.position.z += d.vz*dt;
+        if(p.position.x>edLim) p.position.x=-edLim;
+        if(p.position.z>edLim) p.position.z=-edLim; else if(p.position.z<-edLim) p.position.z=edLim;
+        p.scale.x = d.sx*(1+Math.sin(T*d.sp+d.ph)*0.12);       // slow billow as it drifts
       }
     }
     // ---- tomb biome: night's last mist drifts through the garden; the doorway light breathes ----
