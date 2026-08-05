@@ -368,6 +368,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xffe6c4); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='pasture' && !night){
+      // shepherd-country afternoon (Psalm 23): the sun swung low toward the down-screen
+      // side so every hedgerow, fold-stone and woolly back wears a golden rim and throws
+      // its shadow up the field, with a green bounce off the turf keeping shadows soft
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe6eecc), 0.30), near||54, far||98);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.2; sun.color.set(0xffe7b0);
+      sun.position.set(26, 24, 30);
+      hemi.color.set(0xcfe8f6); hemi.groundColor.set(0x6f9c4e); hemi.intensity = 0.88;
+      ambLight.color.set(0xfff0d4); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.interior){
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
@@ -2245,6 +2257,181 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       sh.rotation.y=Math.random()*TAU; sh.castShadow=false; decor.add(sh); }
   }
 
+  // ---- Pasture hills / the sheepfold (the 'pasture' biome — Luke 15:4-6 by day, and by
+  //      night Luke 2:8: "shepherds living out in the fields nearby, keeping watch over
+  //      their flocks at night"). Real shepherd country: turf stitched into little fields
+  //      by hedgerows, a dry-stone fold with its gate standing open, a spring-fed trough.
+  //      At night the same fields become Christmas: Bethlehem climbs its hill on the
+  //      up-screen horizon with every window lit, the flock lies safe inside the fold,
+  //      and two shepherds warm their hands at a crackling watchfire. ----
+  const PA_A = Math.PI*1.25;                       // Bethlehem waits up-screen on the camera diagonal
+  const PA_STONE=[0xa39a88,0x968d7b,0xaea595,0x8a8170];   // lichen-dusted field-stone
+  const PA_HEDGE=[0x3f7a3c,0x467f41,0x386f38,0x4b8a46];   // hedgerow greens, darker than the turf
+  let paSmoke=[], paWinM=null;
+  function paFold(cx,cz){
+    // the dry-stone sheepfold: two courses of stacked stones in a broken ring, the gap
+    // facing the open pasture with a wattle hurdle-gate leaning wide open beside it,
+    // and a little thatched lean-to at the back wall for the worst weather
+    const R=4.3, openA=Math.atan2(-cz,-cx);        // the gate looks out over the field, toward the world's heart
+    const N=24;
+    for(let i=0;i<N;i++){
+      const a=openA+ (i/N)*TAU;
+      let da=a-openA; while(da>Math.PI)da-=TAU; while(da<-Math.PI)da+=TAU;
+      if(Math.abs(da)<0.52) continue;              // the gateway
+      const x=cx+Math.cos(a)*R, z=cz+Math.sin(a)*R;
+      const b=new THREE.Mesh(ugeo('blob'), flatMat(PA_STONE[i%4]));
+      b.scale.set(1.0+((i*7)%3)*.12, .62+((i*5)%3)*.09, .84); b.position.set(x,.30,z);
+      b.rotation.y=a+((i*11)%5)*.3; b.castShadow=false; b.receiveShadow=true; decor.add(b);
+      if(i%2===0){ const t=new THREE.Mesh(ugeo('blob'), flatMat(PA_STONE[(i+1)%4]));
+        t.scale.set(.72,.44,.60); t.position.set(x+Math.cos(a+1.3)*.14,.82,z+Math.sin(a+1.3)*.14);
+        t.rotation.y=a*1.7; t.castShadow=false; decor.add(t); }
+    }
+    [-0.52,0.52].forEach(da=>{                     // stout gateposts either side of the gap
+      const a=openA+da, p=part('cylinder',0x6b4a2b, cx+Math.cos(a)*R,.72,cz+Math.sin(a)*R, .17,1.44,.17);
+      p.castShadow=false; decor.add(p); });
+    { // the hurdle gate, swung wide open against the wall — nobody is shut out tonight
+      const a=openA+0.52, hx=cx+Math.cos(a)*R, hz=cz+Math.sin(a)*R;
+      const g=new THREE.Group();
+      [.10,.62,1.10].forEach(y=>g.add(box(1.9,.09,.06, 0x8a6538, .95,y,0)));
+      [.25,.95,1.65].forEach(px=>g.add(box(.07,1.18,.06, 0x7a5530, px,.60,0)));
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(hx,0,hz); g.rotation.y=-a+2.35; decor.add(g); }
+    { // thatched lean-to against the back wall
+      const a=openA+Math.PI, sx=cx+Math.cos(a)*(R-.9), sz=cz+Math.sin(a)*(R-.9);
+      const g=new THREE.Group();
+      [-1.15,1.15].forEach(px=>g.add(part('cylinder',0x6b4a2b, px,.85,.7, .13,1.7,.13)));
+      const th=sph(0xcbb277, 0,1.85,.15, 1.85,.30,1.45); th.rotation.x=-.38; g.add(th);
+      const rd=sph(0xdfcb92, 0,2.12,-.35, 1.55,.18,.55); rd.castShadow=false; g.add(rd);
+      g.position.set(sx,0,sz); g.rotation.y=a; decor.add(g); }
+    { // the stone water-trough by the gate — "he leads me beside quiet waters" (Ps 23:2)
+      const a=openA-0.85, tx2=cx+Math.cos(a)*(R+1.3), tz2=cz+Math.sin(a)*(R+1.3);
+      const g=new THREE.Group();
+      g.add(box(2.0,.62,.94, PA_STONE[1], 0,.31,0));
+      const wt=box(1.72,.08,.66, 0x3e7a8e, 0,.56,0); wt.castShadow=false; g.add(wt);
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(tx2,0,tz2); g.rotation.y=-a; decor.add(g); }
+    { // the shepherd's crook leaning on the wall
+      const g=new THREE.Group();
+      g.add(part('cylinder',0x8a6538, 0,.95,0, .06,1.9,.06));
+      g.add(part('torus',0x8a6538, .10,1.94,0, .30,.30,.30, 0,0,.4));
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(cx+Math.cos(openA-0.75)*R,0,cz+Math.sin(openA-0.75)*R);
+      g.rotation.set(.16,0,.22); decor.add(g); }
+  }
+  function paHedge(x,z,ry,n){
+    // a hedgerow: one tight row of clipped rounded bushes with a few dog-rose dots —
+    // the thing that turns "a green plane" into "somebody's sheep country"
+    const g=new THREE.Group();
+    for(let i=0;i<n;i++){
+      const px=(i-(n-1)/2)*1.05, s=.72+((i*7)%4)*.09;
+      g.add(sph(PA_HEDGE[i%4], px, .52+((i*3)%3)*.07, ((i*5)%3-1)*.14, s, .58+((i*5)%4)*.07, .66));
+    }
+    for(let i=0;i<3;i++){ const px=((i*2.7)-(n-1)/2*.8)*1.0;
+      g.add(sph([0xfff2f6,0xffd9e2,0xfff8e8][i], px, 1.02, .28, .085)); }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=ry; windify(g,0.006); decor.add(g); return g;
+  }
+  function paTuft(x,z){
+    // a knee-high tuft of meadow grass gone to seed
+    const g=new THREE.Group(), c=[0x8fae54,0x7da44c,0x9cb862];
+    for(let i=0;i<3;i++){
+      const px=(Math.random()-.5)*.5, pz=(Math.random()-.5)*.5;
+      g.add(conePart(c[i%3], px,.34+Math.random()*.14,pz, .10,.68+Math.random()*.28, (Math.random()-.5)*.5,0,(Math.random()-.5)*.5));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.05); decor.add(g); return g;
+  }
+  function paBethlehem(){
+    // the little town of Bethlehem on its hill, up-screen behind the stable: deep-blue
+    // sleeping walls stacked up the slope, every window a warm lit ember (Luke 2:15
+    // "let's go to Bethlehem") — the whole horizon says where the star is leading
+    if(!paWinM) paWinM=new THREE.MeshBasicMaterial({color:0xffcf7e});
+    const W=WORLD_R, gR=W*1.42;
+    const hill=sph(0x1c2338, Math.cos(PA_A)*(gR+9), -1.5, Math.sin(PA_A)*(gR+9), W*.78,7.5,W*.62);
+    hill.rotation.y=-PA_A+Math.PI/2; hill.castShadow=false; hill.receiveShadow=false; decor.add(hill);
+    const HC=[0x353b54,0x2f354c,0x3b4260,0x2a3047];
+    for(let k=0;k<11;k++){
+      const a=PA_A+(k-5)*0.075+((k*7)%3-1)*.02, rr=gR+((k*5)%4)*2.6;
+      const hx=Math.cos(a)*rr, hz=Math.sin(a)*rr;
+      const hw=2.6+((k*3)%3)*.5, hh=2.2+((k*7)%4)*.7, hy=((k*5)%4)*1.15;
+      const hb=box(hw,hh,2.4, HC[k%4], hx,hy+hh/2,hz);
+      hb.rotation.y=-a+Math.PI/2+((k%3)-1)*.15; hb.castShadow=false; decor.add(hb);
+      const wn=new THREE.Mesh(boxGeo, paWinM);                   // one small window still burning
+      wn.scale.set(.34,.44,.1); wn.position.set(hx+Math.cos(a)* -1.25, hy+hh*.55, hz+Math.sin(a)* -1.25);
+      wn.rotation.y=hb.rotation.y; wn.castShadow=false; decor.add(wn);
+      if(k%3===0){ const w2=wn.clone(); w2.position.x+=Math.cos(a+Math.PI/2)*hw*.3;
+        w2.position.z+=Math.sin(a+Math.PI/2)*hw*.3; w2.position.y=hy+hh*.28; decor.add(w2); }
+    }
+    { // the watchtower of the flock (Migdal Eder) at the crest
+      const a=PA_A, rr=gR+7, tx=Math.cos(a)*rr, tz=Math.sin(a)*rr;
+      const tw=part('cylinder', 0x3b4260, tx,7.0,tz, 1.5,6.4,1.5); tw.castShadow=false; decor.add(tw);
+      const cap=conePart(0x2a3047, tx,10.7,tz, 1.05,1.5); cap.castShadow=false; decor.add(cap);
+      const wn=new THREE.Mesh(boxGeo, paWinM); wn.scale.set(.4,.5,.1);
+      wn.position.set(tx+Math.cos(a)*-1.55, 8.6, tz+Math.sin(a)*-1.55); wn.rotation.y=-a+Math.PI/2;
+      wn.castShadow=false; decor.add(wn); }
+  }
+  function paWatchfire(x,z){
+    // the shepherds' watchfire: stone ring, crossed logs, wind-flickered flames (the sway
+    // loop animates them free), firelight pooled on the turf, smoke climbing off downwind
+    const g=new THREE.Group();
+    for(let i=0;i<5;i++){ const a=i/5*TAU; const st=new THREE.Mesh(ugeo('blob'), flatMat(PA_STONE[i%4]));
+      st.position.set(Math.cos(a)*1.0,.14,Math.sin(a)*1.0); st.scale.set(.48,.32,.42);
+      st.rotation.y=a; st.castShadow=false; st.receiveShadow=true; g.add(st); }
+    g.add(part('cylinder',0x5a4028, 0,.24,0, .13,1.4,.13, Math.PI/2,.5,0));
+    g.add(part('cylinder',0x4c3620, 0,.28,0, .13,1.4,.13, Math.PI/2,-.6,0));
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffa347}));
+    fl.position.y=.82; fl.scale.set(.52,.92,.52); g.add(fl);
+    const core=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe1a0}));
+    core.position.y=.76; core.scale.set(.26,.52,.26); g.add(core);
+    const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffb060, transparent:true, opacity:.25}));
+    halo.position.y=.9; halo.scale.setScalar(1.25); g.add(halo);
+    g.position.set(x,0,z); windify(g,.03); decor.add(g);
+    const pool=new THREE.Mesh(ugeo('sphere'), fnEmberM);           // firelight warming the grass
+    pool.position.set(x,.05,z); pool.scale.set(2.5,.02,2.1); pool.castShadow=false; decor.add(pool);
+    if(!vlSmokeM) vlSmokeM=new THREE.MeshLambertMaterial({color:0xd8d2c8, transparent:true, opacity:.32});
+    for(let i=0;i<5;i++){ const p=new THREE.Mesh(ugeo('sphere'), vlSmokeM); p.castShadow=false;
+      const y0=1.0, top=5.8+Math.random()*1.4;
+      p.userData={x, z, y:y0+Math.random()*(top-y0), y0, top, vy:.5+Math.random()*.3, s0:.30+Math.random()*.14, ph:Math.random()*TAU};
+      p.scale.setScalar(p.userData.s0); decor.add(p); paSmoke.push(p); }
+  }
+  function pastureScenery(){
+    paSmoke=[];
+    const W=WORLD_R, night=!!(currentEnv&&currentEnv.night);
+    // the fold sits on the (+x,−z) flank — in frame all the way up the walk to the goal,
+    // never hidden behind the camera or the joystick — its gate open toward the pasture
+    const fa=PA_A+Math.PI/2, fr=W-7.5, fx=Math.cos(fa)*fr, fz=Math.sin(fa)*fr;
+    paFold(fx,fz);
+    // hedgerows stitch the turf into fields (kept off the spawn and the up-screen goal cone)
+    paHedge(-W*0.52, W*0.18, 0.35, 9);
+    paHedge(-W*0.58,-W*0.30, -1.05, 10);
+    paHedge(-W*0.42, W*0.58, 1.75, 8);
+    paHedge( W*0.60, W*0.30, 0.95, 7);
+    // a couple of broad shade trees, mossy stones, tufts of seeding grass
+    makeTree(-W*0.34, -W*0.10); makeTree(W*0.42, W*0.40); if(W>26) makeTree(-W*0.62, W*0.44);
+    for(let i=0;i<5;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>6) makeRock(x,z,.45+Math.random()*.45); }
+    for(let i=0;i<14;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) paTuft(x,z); }
+    if(night){
+      // the night of the Nativity: Bethlehem lit on its hill, the flock folded, the watch kept
+      paBethlehem();
+      const ux=-Math.cos(fa), uz=-Math.sin(fa);    // from the fold gate out toward the open field
+      const wx=fx+ux*5.6, wz=fz+uz*5.6;
+      paWatchfire(wx,wz);
+      const s1=makeNPC('shepherd'); s1.position.set(wx+ux*1.9-uz*1.2, 0, wz+uz*1.9+ux*1.2);
+      s1.rotation.y=Math.atan2(wx-s1.position.x, wz-s1.position.z); decor.add(s1);
+      const s2=makeNPC('shepherd'); s2.position.set(wx+uz*2.0, 0, wz-ux*2.0);
+      s2.rotation.y=Math.atan2(wx-s2.position.x, wz-s2.position.z); decor.add(s2);
+      for(let i=0;i<3;i++){                        // the flock, safe inside the fold for the night
+        const a=fa+ -0.6+i*0.62, sp=makeAnimal('sheep');
+        sp.position.set(fx+Math.cos(a)*1.7, 0, fz+Math.sin(a)*1.7);
+        sp.rotation.y=Math.random()*TAU; sp.scale.setScalar(.92); decor.add(sp);
+      }
+    } else {
+      // high spring day: wildflower drifts along the hedge-feet and out across the turf
+      for(let i=0;i<12;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) makeFlower(x,z); }
+      for(let i=0;i<4;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>6) makeScrub(x,z); }
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -2283,6 +2470,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       villageScenery();
     } else if(d==='jericho'){
       jerichoScenery();
+    } else if(d==='pasture'){
+      pastureScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -2678,16 +2867,31 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     return g;
   }
   function makeStable(){
+    // the Bethlehem stable, OPEN at the front (local +z): stone-footed timber posts under
+    // a deep thatched gable, plank walls behind — so the manger and the Child inside are
+    // lit and visible as the child walks up, not hidden behind a shut brown box
     const g = new THREE.Group();
-    g.add(box(5,3,4,0x8a5a2b,0,1.5,0));
-    g.add(box(5.6,1,4.4,0xcaa06a,0,3.4,0));
-    g.add(part('cylinder', 0xd9b463, -1.8,.5,1.6, .5,1.0,.5, 0,0,Math.PI/2)); // hay bale
-    g.add(part('cylinder', 0xd9b463, -1.8,.5,1.0, .5,1.0,.5, 0,0,Math.PI/2)); // hay bale
-    g.add(sph(0x9a6a3a, 0,.75,1.6, .60,.28,.42));                  // manger trough
-    g.add(sph(0xfff2cc, 0,1.05,1.6, .34,.24,.30));                 // swaddled baby
-    g.add(sph(0xf2c79a, 0,1.24,1.72, .13,.12,.12));                // baby's face
-    g.add(part('torus', 0xffe9a8, 0,1.55,1.6, .40,.40,.05, Math.PI/2,0,0)); // soft halo
-    const glow = new THREE.PointLight(0xffe9c0,1.1,9); glow.position.set(0,1.5,1.6); g.add(glow);
+    const POST=0x6e4a26, PLANK=0x7d5127, PLANKD=0x64411f;
+    [[-2.3,-1.5],[2.3,-1.5],[-2.3,1.7],[2.3,1.7]].forEach(p=>{
+      g.add(part('cylinder',POST, p[0],1.55,p[1], .22,3.1,.22));
+      const ft=new THREE.Mesh(ugeo('blob'), flatMat(0x968d7b)); ft.scale.set(.62,.4,.62);
+      ft.position.set(p[0],.15,p[1]); ft.rotation.y=p[0]; ft.castShadow=false; g.add(ft);
+    });
+    for(let i=0;i<5;i++){ const pl=box(4.6,.52,.14, i%2?PLANK:PLANKD, 0,.42+i*.55,-1.62); pl.castShadow=false; g.add(pl); }
+    [-2.3,2.3].forEach(x=>{ for(let i=0;i<3;i++){ const pl=box(.14,.5,3.1, i%2?PLANKD:PLANK, x,.4+i*.52,0); pl.castShadow=false; g.add(pl); }});
+    const r1=box(3.4,.26,4.9, 0xcbb277, -1.28,3.55,0); r1.rotation.z=.42; g.add(r1);
+    const r2=box(3.4,.26,4.9, 0xbfa668,  1.28,3.55,0); r2.rotation.z=-.42; g.add(r2);
+    const rg=sph(0xdfcb92, 0,4.22,0, .50,.20,2.45); rg.castShadow=false; g.add(rg);
+    g.add(sph(0xd9b463, -1.5,.42,-.6, .95,.50,.80));               // heaped hay
+    g.add(sph(0xd9b463, 1.6,.34,-.8, .70,.40,.60));
+    g.add(box(.9,.5,.7, 0x7a5230, 0,.25,.55));                     // manger stand
+    g.add(sph(0x9a6a3a, 0,.66,.55, .72,.32,.50));                  // the manger trough
+    g.add(sph(0xe8cd8a, 0,.80,.55, .58,.14,.38));                  // straw bedding
+    g.add(sph(0xfff2cc, 0,.94,.55, .38,.26,.30));                  // the swaddled Child
+    g.add(sph(0xf2c79a, 0,1.08,.72, .14,.13,.13));                 // His face
+    const hal=part('torus', 0xffe9a8, 0,1.34,.60, .52,.52,.52, Math.PI/2);
+    hal.material=new THREE.MeshBasicMaterial({color:0xffe9a8}); hal.castShadow=false; g.add(hal);
+    const glow = new THREE.PointLight(0xffe9c0,1.25,10); glow.position.set(0,1.5,.7); g.add(glow);
     return g;
   }
   function makeStar(x,y,z){
@@ -3204,6 +3408,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SCORCH =[0x4a3c31,0x413429,0x55453a,0x382d24];   // the plain of Dura — ash-gray earth scorched warm around the kiln (furnace biome)
   const GALIL  =[0x8cab55,0x7f9f4d,0x99b761,0x729449];   // dry summer grass above the Galilee shore (village biome)
   const JPLAIN =[0xd2b088,0xc7a67c,0xdcbc94,0xb99a70];   // the sun-baked plain of Jericho — dusty rose-tan (jericho biome)
+  const MEADOW =[0x7fb757,0x73ac4d,0x8cc264,0x679d45];   // soft shepherd-country turf, clover-dark in the hollows (pasture biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -3232,7 +3437,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'sheep', name:'The Lost Sheep', emoji:'🐑', type:'find', base:1,
       goal:'One little lamb is lost. Explore and find it!',
       verse:'“Rejoice with me; I have found my lost sheep.” — Luke 15:6',
-      env:{ ground:GREEN, water:null, sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:MEADOW, water:null, sky:0xaadcf2, fogFar:98, decor:'pasture' } },
     { id:'coin', name:'The Lost Coin', emoji:'🪙', type:'collect', base:10, fixed:10, item:'coin',
       goal:'The woman searched her whole house! Help find all ten silver coins.',
       verse:'“Rejoice with me; I have found my lost coin.” — Luke 15:9',
@@ -3340,7 +3545,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'star', name:'Follow the Star', emoji:'⭐', type:'reach',
       goal:'Follow the bright star to find baby Jesus!',
       verse:'“We saw his star… and have come to worship him.” — Matthew 2:2',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:88, decor:'pasture', night:true } },
     { id:'baptism', name:'Jesus Is Baptized', emoji:'🕊️', type:'reach',
       goal:'At the Jordan River, God’s Spirit came down like a gentle dove! Walk to Jesus at the river!',
       verse:'“And a voice from heaven said, ‘This is my Son, whom I love; with him I am well pleased.’” — Matthew 3:17',
@@ -3454,7 +3659,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       const ang = Math.random()*TAU, R=WORLD_R-3;
       const lost=makeAnimal('sheep'); lost.scale.multiplyScalar(0.8);
       lost.position.set(Math.cos(ang)*R, 0, Math.sin(ang)*R);
-      const halo=box(1.4,.2,1.4,0xffe14d, 0,2.6,0); halo.material=new THREE.MeshBasicMaterial({color:0xffe14d}); lost.add(halo);
+      const halo=part('torus',0xffe14d, 0,2.4,0, .95,.95,.95, Math.PI/2);   // a soft golden halo ring, not a flat square
+      halo.material=new THREE.MeshBasicMaterial({color:0xffe14d}); halo.castShadow=false; lost.add(halo);
       lost.userData.type='sheep'; lost.userData.vx=Math.random()*2-1; lost.userData.vz=Math.random()*2-1; lost.userData.turnT=Math.random()*2;
       lost.userData.lost=true; critters.add(lost); missionCtx.special=lost; missionCtx.target=1;
       const sh=makeNPC('shepherd'); sh.position.set(3,0,3); sh.rotation.y=-2.3; props.add(sh);
@@ -3586,10 +3792,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       // (+16,20,+16), so this cone is up-screen and in frame — never hidden behind the joystick/HUD
       const ang=Math.PI*0.75 + 0.25 + Math.random()*(Math.PI - 0.5);
       if(mission.id==='star'){
-        const R=WORLD_R-4, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
-        const stable=makeStable(); stable.position.set(gx,0,gz); props.add(stable);
+        // pinned on the camera diagonal at the foot of lit Bethlehem (the pasture biome
+        // builds the town around PA_A), the stable turned so the manger greets the child
+        const R=WORLD_R-4, gx=Math.cos(PA_A)*R, gz=Math.sin(PA_A)*R;
+        const stable=makeStable(); stable.position.set(gx,0,gz); stable.rotation.y=Math.atan2(-gx,-gz); props.add(stable);
         const star=makeStar(gx, 12, gz); props.add(star); missionCtx.goalObj=stable; missionCtx.starObj=star;
-        const mary=makeNPC('mary'); mary.position.set(gx+2.5,0,gz+1.5); mary.rotation.y=-2.2; props.add(mary);
+        const mary=makeNPC('mary'); mary.position.set(gx+2.7,0,gz+0.4); mary.rotation.y=-1.2; props.add(mary);   // at the doorpost, turned toward the manger — not blocking the child's view of it
         say('Follow the shining star! ⭐',3800);
       } else if(mission.id==='ladder'){ // Jacob's dream — walk to the glowing stairway
         const R=WORLD_R-5, gx=Math.cos(ang)*R, gz=Math.sin(ang)*R;
@@ -4251,6 +4459,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const gr=(d.y-d.y0)/(d.top-d.y0);
         p.position.set(d.x+Math.sin(T*.5+d.ph)*(.15+gr*1.0)+gr*2.0, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.8));
         p.scale.setScalar(d.s0*(.5+gr*1.5));                       // swelling as the evening wind takes it
+      }
+    }
+    // ---- pasture biome by night: the shepherds' watchfire smoke climbs off across the fields ----
+    if(currentEnv && currentEnv.decor==='pasture' && paSmoke.length){
+      for(const p of paSmoke){ const d=p.userData;
+        d.y += d.vy*dt; if(d.y>d.top) d.y=d.y0;
+        const gr=(d.y-d.y0)/(d.top-d.y0);
+        p.position.set(d.x+Math.sin(T*.5+d.ph)*(.15+gr*.9)+gr*1.4, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.7)+gr*1.0);
+        p.scale.setScalar(d.s0*(.5+gr*1.5));                       // thinning off downwind toward the town
       }
     }
     // ---- storm biome: driving rain, lightning + thunder, and the moment the sea goes still ----
