@@ -461,6 +461,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       return;
     }
     if(currentEnv && currentEnv.interior){
+      if(currentEnv.decor==='fish'){
+        // the belly of the great fish (Jonah 2): sea-green gloom lit two ways — one pale watery
+        // key streaming in through the far-off mouth (up-screen, where the goal waits), and a
+        // faint teal fill that seems to come from the glowing flesh itself. No sky, no sun.
+        scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x0d2c26), 0.45), near||30, far||86);
+        starField.visible = false; clouds.visible = false;
+        sun.intensity = 0.95; sun.color.set(0x9fe0d4);
+        sun.position.set(0, 16, -44);              // sea-light pouring from the mouth — every fold wears a cool rim facing the way out
+        hemi.color.set(0x477a70); hemi.groundColor.set(0x40262f); hemi.intensity = 0.95;
+        ambLight.color.set(0x8fe0cc); ambLight.intensity = 0.42;
+        return;
+      }
       if(currentEnv.decor==='den'){
         // underground: one pale steep key light — day falling through the mouth of the den —
         // over cool stone ambience, with a warm undertone from the wall torches
@@ -1716,6 +1728,147 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       .forEach(p=>denTorch(p[0],p[1],p[2]));
     const warmA=new THREE.PointLight(0xffb066, 1.35, 34); warmA.position.set(-TR*0.55, 4.2, -TR+2); decor.add(warmA);
     const warmB=new THREE.PointLight(0xffb066, 1.2, 34); warmB.position.set(TR-2, 4.2, -TR*0.5); decor.add(warmB);
+  }
+
+  // ---- Inside the great fish (the 'fish' biome — Jonah 1:17–2:10): the belly of the whale.
+  //      A ribbed organic cavern that BREATHES: soft flesh folds enclosing the floor, pale
+  //      cartilage rib-arches overhead, bioluminescent nodules pulsing teal on their own
+  //      clocks, glossy tide-pools of swallowed sea, kelp still swaying like it remembers
+  //      the current, flotsam from some unlucky ship — and far up-screen, the one way out:
+  //      the sea-green light of the mouth (built with the goal in startMission). ----
+  let gfGlows=[], gfFishes=[], gfDrips=[], gfBelly=null;
+  const GF_WALL=[0x6f3e4c,0x653845,0x7b4654,0x59303b];     // deep flesh tones for the belly folds
+  const GF_RIB =[0xa8867e,0x9c7a72,0xb2938a];              // pale cartilage, kept muted under the teal light
+  const seaShaftM=new THREE.MeshBasicMaterial({color:0xaef2e2, transparent:true, opacity:0.11,
+    blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const seaPoolM=new THREE.MeshBasicMaterial({color:0x9fe8da, transparent:true, opacity:0.14,
+    blending:THREE.AdditiveBlending, depthWrite:false});
+  const tideM=new THREE.MeshPhongMaterial({color:0x14343a, shininess:130, specular:0xbffff0,
+    transparent:true, opacity:0.62});                      // glossy tide-pool — catches the glow-light wet
+  const dripM=new THREE.MeshBasicMaterial({color:0xbfeee4, transparent:true, opacity:0.5, fog:false});
+  function gfGlow(x,y,z,s){                                // a bioluminescent nodule (each pulses on its own clock)
+    const m=new THREE.MeshBasicMaterial({color:0x7dffe4, transparent:true, opacity:.7, fog:false,
+      blending:THREE.AdditiveBlending, depthWrite:false});
+    const g=new THREE.Mesh(ugeo('sphere'), m);
+    g.userData={sp:.5+Math.random()*.9, ph:Math.random()*TAU, o0:.55+Math.random()*.3, s0:s};
+    g.position.set(x,y,z); g.scale.setScalar(s); g.castShadow=false; decor.add(g); gfGlows.push(g); return g;
+  }
+  function gfKelp(x,z){                                    // swallowed kelp, still swaying like it remembers the sea
+    const g=new THREE.Group(), KC=[0x1f4a3c,0x28584a,0x1a4034];
+    for(let i=0;i<3;i++){
+      const px=(Math.random()-.5)*.6, pz=(Math.random()-.5)*.6;
+      g.add(part('capsule',KC[i%3], px,.8+Math.random()*.5,pz, .13,.9+Math.random()*.6,.05,
+        (Math.random()-.5)*.5, Math.random()*TAU, (Math.random()-.5)*.4));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.06); decor.add(g); return g;
+  }
+  function fishScenery(){
+    gfGlows=[]; gfFishes=[]; gfDrips=[]; gfBelly=null;
+    const W=WORLD_R;
+    // pitch-dark backstop cylinder so no horizon can ever leak between the flesh folds
+    const shell=new THREE.Mesh(new THREE.CylinderGeometry(W+7,W+7,20,24,1,true),
+      new THREE.MeshLambertMaterial({color:0x1c0e13, side:THREE.BackSide}));
+    shell.position.y=9; shell.castShadow=false; decor.add(shell);
+    // the belly itself lives in one group so frame() can make the whole cavern breathe
+    gfBelly=new THREE.Group(); decor.add(gfBelly);
+    const N=20;
+    for(let i=0;i<N;i++){                                  // lower wall: great soft folds of flesh
+      const a=i/N*TAU+Math.random()*.2, r=W+2.6, x=Math.cos(a)*r, z=Math.sin(a)*r;
+      const m=new THREE.Mesh(ugeo('blob'), flatMat(GF_WALL[i%4]));
+      m.scale.set(5.5+Math.random()*2.2, 6.5+Math.random()*3.5, 5.5+Math.random()*2.2);
+      m.rotation.set((Math.random()-.5)*.3, Math.random()*TAU, (Math.random()-.5)*.3);
+      m.position.set(x, 1.6+Math.random()*1.4, z);
+      m.castShadow=false; m.receiveShadow=true; gfBelly.add(m);
+      if(i%2===0){                                         // upper folds leaning inward — the belly closing overhead
+        const u=new THREE.Mesh(ugeo('blob'), flatMat(GF_WALL[(i+2)%4]));
+        u.scale.set(6+Math.random()*2.5, 5+Math.random()*2.5, 6+Math.random()*2.5);
+        u.rotation.set((Math.random()-.5)*.4, Math.random()*TAU, (Math.random()-.5)*.4);
+        u.position.set(x*0.9, 8.5+Math.random()*2, z*0.9);
+        u.castShadow=false; gfBelly.add(u);
+      }
+    }
+    for(let i=0;i<7;i++){                                  // pale rib-arches climbing the walls and vanishing overhead
+      const rz=-W*0.72 + i*(W*1.44/6);
+      const rib=new THREE.Mesh(ugeo('arc'), flatMat(GF_RIB[i%3]));
+      const sp=1-Math.abs(rz)/(W*1.15);                    // ribs swell amidships, tighten toward throat and mouth
+      // crowns arc HIGH over the steep play camera (apex ≈ .5*scale.y) — only the side
+      // columns show in frame, so the ribcage reads without ever blocking the view
+      rib.scale.set(W*1.85+sp*5, 38+sp*6, 15);
+      rib.position.set(0, 0.4, rz);
+      rib.castShadow=false; rib.receiveShadow=true; gfBelly.add(rib);
+    }
+    // bioluminescent nodules — scattered across the floor folds, and studding the walls
+    for(let i=0;i<12;i++){ const [x,z]=randPos(2.5); if(Math.hypot(x,z)<5) continue;
+      gfGlow(x, .22+Math.random()*.4, z, .13+Math.random()*.1); }
+    for(let i=0;i<10;i++){ const a=Math.random()*TAU, r=W+1.2;
+      gfGlow(Math.cos(a)*r, 2.5+Math.random()*4.5, Math.sin(a)*r, .2+Math.random()*.18); }
+    // soft flesh polyps — low rounded bumps that give the floor its organic texture
+    for(let i=0,n=Math.round(W*0.5);i<n;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)<4.5) continue;
+      const b=sph(GF_WALL[i%4], x, .1, z, .5+Math.random()*.6, .22+Math.random()*.2, .5+Math.random()*.6);
+      b.rotation.y=Math.random()*TAU; b.castShadow=false; b.receiveShadow=true; decor.add(b); }
+    // glossy tide-pools of swallowed sea — the wet shine on the belly floor
+    for(let i=0;i<8;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)<6) continue;
+      const p=new THREE.Mesh(ugeo('sphere'), tideM);
+      p.scale.set(1.6+Math.random()*1.4, .06, 1.2+Math.random()*1.1);
+      p.rotation.y=Math.random()*TAU; p.position.set(x,.05,z);
+      p.castShadow=false; p.receiveShadow=true; decor.add(p);
+    }
+    for(let i=0,n=Math.round(W*0.35);i<n;i++){ const [x,z]=randPos(2.5); if(Math.hypot(x,z)>5) gfKelp(x,z); }
+    // flotsam from some unlucky ship the fish swallowed whole
+    for(let i=0;i<3;i++){ const [x,z]=randPos(4);          // planks
+      if(Math.hypot(x,z)<7) continue;
+      const pl=box(2.0+Math.random()*.8,.14,.5, 0x6b4a34, x,.08,z);
+      pl.rotation.y=Math.random()*TAU; pl.castShadow=false; decor.add(pl); }
+    { const [x,z]=randPos(5);                              // a barrel on its side
+      const b=part('cylinder',0x7a5638, x,.42,z, .8,1.3,.8, Math.PI/2,0,Math.random()*TAU);
+      b.castShadow=false; decor.add(b); }
+    { const [x,z]=randPos(5);                              // a cracked amphora, spilled
+      const g=new THREE.Group();
+      g.add(part('cylinder',0xb5714a, 0,.30,0, .5,.72,.5, 0,0,1.25));
+      g.add(sph(0xc57e52, .28,.44,0, .34,.28,.34));
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); }
+    { const [x,z]=randPos(5);                              // an old fish, down to pale bones
+      const g=new THREE.Group();
+      g.add(part('capsule',0xe0d6c8, 0,.14,0, .06,.7,.06, 0,0,Math.PI/2));
+      for(let k=-2;k<=2;k++) g.add(part('capsule',0xd6cabb, k*.28,.16,0, .04,.2,.04));
+      g.add(sph(0xe0d6c8, -.85,.16,0, .16,.13,.11));
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); }
+    // fleshy tendrils hanging out of the dark above, swaying with every breath
+    // (kept out by the walls — never in the camera's corridor over the play floor)
+    for(let i=0;i<8;i++){ const a=Math.random()*TAU, r=W*(0.78+Math.random()*0.14);
+      const g=new THREE.Group();
+      const len=1.2+Math.random()*.7;
+      g.add(part('capsule',0x6b3a46, 0,-len,0, .15,len,.15));
+      g.add(sph(0x8a4c58, 0,-len*2+.1,0, .16,.19,.16));    // a paler swollen tip
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(Math.cos(a)*r, 9.6+Math.random()*1.6, Math.sin(a)*r);
+      windify(g,0.05); decor.add(g);
+    }
+    // sea-water drips falling from the ribs (recycled top-to-floor in frame())
+    for(let i=0;i<9;i++){ const a=Math.random()*TAU, r=W*(0.3+Math.random()*0.6);
+      const d=new THREE.Mesh(ugeo('sphere'), dripM);
+      const y0=7.5+Math.random()*3;
+      d.userData={y0, y:Math.random()*y0, v:5+Math.random()*3};
+      d.scale.set(.05,.3,.05); d.position.set(Math.cos(a)*r, d.userData.y, Math.sin(a)*r);
+      d.castShadow=false; decor.add(d); gfDrips.push(d);
+    }
+    // little glowing fish, swallowed too — they glide slow circles low over the floor
+    for(let i=0;i<5;i++){
+      const f=new THREE.Group();
+      const bm=new THREE.MeshBasicMaterial({color:0x8fe8dc, transparent:true, opacity:.75, fog:false});
+      const body=new THREE.Mesh(ugeo('sphere'), bm); body.scale.set(.16,.14,.34); f.add(body);
+      const tail=new THREE.Mesh(ugeo('cone'), bm); tail.scale.set(.12,.24,.04);
+      tail.position.set(0,0,-.42); tail.rotation.x=-Math.PI/2; f.add(tail);
+      const [x,z]=randPos(3);
+      f.userData={cx:x, cz:z, r:2+Math.random()*3, h:.8+Math.random()*1.6, sp:.3+Math.random()*.35, ph:Math.random()*TAU};
+      f.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      decor.add(f); gfFishes.push(f);
+    }
+    const glowL=new THREE.PointLight(0x5fe8cc, 1.0, 42);   // bioluminescent fill — the belly's own light
+    glowL.position.set(0,5,0); decor.add(glowL);
   }
 
   // ---- The New Jerusalem (the 'heaven' biome — Revelation 21): the grand finale.
@@ -3308,6 +3461,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       wheatScenery();
     } else if(d==='den'){
       denScenery();
+    } else if(d==='fish'){
+      fishScenery();
     } else if(d==='heaven'){
       heavenScenery();
     } else if(d==='storm'){
@@ -4265,6 +4420,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SEDGE = [0x6fb054,0x7cb95f,0x64a24a,0x94ad62];   // riverbank sedge-green fading into dry khaki
   const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
   const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
+  const BELLY = [0x8f5a68,0x83515f,0x9b6472,0x744a58];   // the great fish's belly floor — wet rose flesh in teal gloom (fish biome)
   const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
   const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
   const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
@@ -4390,9 +4546,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       verse:'“My God sent his angel, and he shut the mouths of the lions.” — Daniel 6:22',
       env:{ ground:CAVE, water:null, sky:0x0f0c0a, fogNear:24, fogFar:60, decor:'den', interior:true, night:true } },
     { id:'jonah', name:'Jonah & the Great Fish', emoji:'🐋', type:'reach',
-      goal:'Walk along the shore to the great fish!',
+      goal:'You are inside the great fish! Jonah prayed, and God heard him. Walk to the light of the fish’s mouth!',
       verse:'“The Lord provided a great fish to swallow Jonah.” — Jonah 1:17',
-      env:{ ground:GALIL, water:'sea', sky:0xbfe2f0, fogFar:102, decor:'village' } },
+      env:{ ground:BELLY, water:null, sky:0x0a1a1e, fogNear:30, fogFar:86, decor:'fish', interior:true, night:true } },
     { id:'storm', name:'Jesus Calms the Storm', emoji:'⛵', type:'reach',
       goal:'The wind and waves obey Jesus! Walk out to the boat where He is!',
       verse:'“He got up, rebuked the wind and said to the waves, ‘Quiet! Be still!’ Then the wind died down and it was completely calm.” — Mark 4:39',
@@ -4913,10 +5069,33 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const ang2=makeNPC('angel'); ang2.position.set(gx*0.86,0,gz*0.86); ang2.rotation.y=Math.atan2(gx-gx*0.86,gz-gz*0.86); props.add(ang2);  // the gentle angel bent toward him
         const lt=new THREE.PointLight(0xffd9a0,.9,12); lt.position.set(gx,3,gz); props.add(lt);
         say('God takes care of His tired helpers! Walk to the angel by the broom tree! 😇',4200);
-      } else { // Jonah — the great fish waits out by the sea
-        const fx=(Math.random()*2-1)*(WORLD_R*0.45), fz=WORLD_R*0.6;
-        const fish=makeFish(); fish.position.set(fx,0,fz); props.add(fish); missionCtx.goalObj=fish;
-        say('Walk toward the great fish by the sea! 🐋',3800);
+      } else { // Jonah — INSIDE the great fish: the mouth parts up-screen, full of sea-light (Jonah 2:10)
+        const gz=-WORLD_R+5;
+        const mo=new THREE.Group(), lipM=flatMat(0x7a4450);
+        [[-5.2,.18],[5.2,-.18]].forEach(p=>{ const lip=new THREE.Mesh(ugeo('blob'), lipM);   // two great jaw-folds parting
+          lip.scale.set(3.4,7.5,3); lip.position.set(p[0],2.2,.4); lip.rotation.z=p[1];
+          lip.castShadow=false; mo.add(lip); });
+        const brow=new THREE.Mesh(ugeo('blob'), lipM); brow.scale.set(9.5,3.2,3);            // the upper lip closing over
+        brow.position.set(0,8.2,.4); brow.castShadow=false; mo.add(brow);
+        const gate=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xcffcf0, fog:false}));
+        gate.scale.set(4.6,7.2,.9); gate.position.y=3.4; mo.add(gate);                       // the opening, white with sea-light
+        const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0x9ff2e2, transparent:true, opacity:.3, fog:false}));
+        halo.scale.set(7.4,9.6,2.2); halo.position.y=3.8; mo.add(halo);
+        for(let i=-2;i<=2;i++){                                                              // baleen curtain hung across the light
+          const b=part('capsule',0xeadfd2, i*0.95, 5.2-Math.abs(i)*.15, .5, .26,1.1-Math.abs(i)*.14,.26);
+          b.castShadow=false; mo.add(b); }
+        const shaft=new THREE.Mesh(ugeo('cone'), seaShaftM); shaft.position.set(0,4.2,3.6);  // the light spilling in across the floor
+        shaft.rotation.x=Math.PI*0.62; shaft.scale.set(6.5,9,6.5); mo.add(shaft);
+        const pool=new THREE.Mesh(ugeo('sphere'), seaPoolM); pool.position.set(0,.06,4.2);
+        pool.scale.set(7,.02,5.6); mo.add(pool);
+        const glow=new THREE.PointLight(0xaffde8, 1.5, 26); glow.position.set(0,4,2.5); mo.add(glow);
+        mo.userData={glow, halo};
+        mo.position.set(0,0,gz); props.add(mo); missionCtx.goalObj=mo;
+        for(let i=1;i<=5;i++){                             // a trail of glow-plankton leading a small explorer's eye to the light
+          const t=i/6, d=new THREE.Mesh(ugeo('sphere'), seaPoolM);
+          d.position.set(Math.sin(i*2.1)*2.2, .05, t*gz*0.9); d.scale.set(.9,.02,.9);
+          d.castShadow=false; props.add(d); }
+        say('Jonah prayed inside the great fish — and God heard him! Walk to the light of its mouth! 🐋',4200);
       }
     }
 
@@ -4935,7 +5114,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(mission.type==='gather'){ sub = missionCtx.collected<missionCtx.target ? ('🐾 '+missionCtx.collected+' / '+missionCtx.target+' animals') : ('➡️ Lead them to '+(mission.reachLabel||'the ark ⛵')); }
     else if(mission.type==='collect'){ sub = (mission.item==='clay'?'⚱️ ':mission.item==='cloth'?'🧵 ':mission.item==='note'?'🎵 ':mission.item==='plank'?'🪵 ':mission.item==='jar'?'🏺 ':mission.item==='fish'?'🐟 ':mission.item==='flame'?'🔥 ':mission.item==='stone'?'🪨 ':mission.item==='palm'?'🌴 ':mission.item==='grain'?'🌾 ':mission.item==='coin'?'🪙 ':mission.item==='pearl'?'🦪 ':mission.item==='horn'?'📯 ':mission.item==='starbit'?'✨ ':mission.item==='gold'?'💰 ':mission.item==='fruit'?'🍎 ':'🍞 ')+missionCtx.collected+' / '+missionCtx.target; }
     else if(mission.type==='find'){ sub='🔦 Explore to find the lost lamb'; }
-    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the great fish', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', builders:'🏠 Walk to the house on the rock', heavencity:'🌟 Walk to the shining city', esther:'👑 Walk to the royal palace', baptism:'🕊️ Walk to Jesus at the river', damascus:'💫 Walk to the shining light', ethiopian:'📜 Walk to the chariot', basket:'🧺 Walk to baby Moses in the reeds', elijahangel:'😇 Walk to the angel by the broom tree', isaiah:'😮 Walk to the glowing altar', furnace:'🔥 Walk to the fiery furnace'}[mission.id] || '⭐ Walk to the star'; }
+    else if(mission.type==='reach'){ sub = {jonah:'🐋 Walk to the light of the mouth', daniel:'🦁 Walk safely to Daniel', walkwater:'🌊 Walk to Jesus', redsea:'🌊 Walk the dry path to Moses', ladder:'🪜 Walk to the shining stairway', tomb:'🌅 Walk to the empty tomb', sinai:'⛰️ Walk to God’s holy mountain', zacchaeus:'🌳 Walk to the sycamore tree', bush:'🔥 Walk to the burning bush', samuel:'🕯️ Walk to the glowing lamp', storm:'⛵ Walk to Jesus in the boat', samaritan:'💗 Walk to the hurt traveler', builders:'🏠 Walk to the house on the rock', heavencity:'🌟 Walk to the shining city', esther:'👑 Walk to the royal palace', baptism:'🕊️ Walk to Jesus at the river', damascus:'💫 Walk to the shining light', ethiopian:'📜 Walk to the chariot', basket:'🧺 Walk to baby Moses in the reeds', elijahangel:'😇 Walk to the angel by the broom tree', isaiah:'😮 Walk to the glowing altar', furnace:'🔥 Walk to the fiery furnace'}[mission.id] || '⭐ Walk to the star'; }
     goalEl.firstChild.textContent = mission.emoji+' '+mission.name;
     goalSub.textContent = sub;
   }
@@ -5367,6 +5546,22 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         nwFire.halo.material.opacity=0.22*br;
         nwFire.pool.material.opacity=0.20*br;
       }
+    }
+    // ---- inside the great fish: the whole belly BREATHES; glow-nodules pulse on their own
+    //      clocks; the swallowed glow-fish glide; sea-drips fall; the mouth-light wells & fades ----
+    if(currentEnv && currentEnv.decor==='fish'){
+      if(gfBelly){ const br=1+Math.sin(T*0.5)*0.013+Math.sin(T*1.7)*0.004;   // slow whale-breath
+        gfBelly.scale.set(br, 1+Math.sin(T*0.5+1.1)*0.009, br); }
+      for(const g of gfGlows){ const d=g.userData, p=.5+.5*Math.sin(T*d.sp+d.ph);
+        g.material.opacity=d.o0*(.3+p*.7); g.scale.setScalar(d.s0*(.8+p*.4)); }
+      for(const f of gfFishes){ const d=f.userData, a=T*d.sp+d.ph;
+        f.position.set(d.cx+Math.cos(a)*d.r, d.h+Math.sin(T*.9+d.ph*2)*.4, d.cz+Math.sin(a)*d.r);
+        f.rotation.y=Math.atan2(-Math.sin(a),Math.cos(a));   // nose (at +z) leads along the circle
+        f.rotation.z=Math.sin(T*2.6+d.ph)*.14; }
+      for(const dr of gfDrips){ const d=dr.userData; d.y-=d.v*dt; if(d.y<.15) d.y=d.y0; dr.position.y=d.y; }
+      const mo=missionCtx&&missionCtx.goalObj;
+      if(mo&&mo.userData.glow){ const br=1+Math.sin(T*1.2)*.12+Math.sin(T*3.1)*.05;   // sea-light wells, never strobes
+        mo.userData.glow.intensity=1.5*br; mo.userData.halo.material.opacity=.30*br; }
     }
     // ---- canyon biome: the hawks wheel on the thermals, banked into their slow circles ----
     if(currentEnv && currentEnv.decor==='canyon' && cyHawks.length){
