@@ -423,6 +423,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       starField.visible = false; clouds.visible = true;
       return;
     }
+    if(currentEnv && currentEnv.decor==='arkyard'){
+      // the week before the rain (Genesis 7:4): the storm wall already stands on the up-screen
+      // horizon, but the sun still owns the build-yard — one low warm key raking in from the
+      // clear corner of the sky, so the hull glows gold AGAINST the slate cloud deck and every
+      // long shadow points at the coming flood. The contrast IS the story: bright work, dark sky.
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x767368), 0.34), near||46, far||96);
+      starField.visible = false; clouds.visible = false;
+      sun.intensity = 1.25; sun.color.set(0xffd898);
+      sun.position.set(30, 20, 24);                // low from the down-screen blue corner — the yard works in gold
+      hemi.color.set(0x8d9aa8); hemi.groundColor.set(0x5d7a46); hemi.intensity = 0.85;   // slate sky above, warm turf bounce below
+      ambLight.color.set(0xffe3b6); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='nightwild'){
       // the open country where God meets people in the dark (Gen 15, Gen 28, 1 Sam 3, Judg 7):
       // a clear high-desert night — the silver key comes from the risen moon's own corner of
@@ -642,6 +655,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         if(rp < 3.4){ const t=1-rp/3.4;                            // pale sun-bleached roadway, soft dusty edges
           cA.lerp(CY_ROAD, Math.min(1, t*1.8)*0.85); }
         else if(rp < 5.2) cA.lerp(cB.copy(cA).multiplyScalar(0.86), (1-(rp-3.4)/1.8)*0.6); // trodden verge
+      }
+      if(env.decor==='arkyard'){                                   // the build-yard: turf churned to mud around the ark
+        const akx=Math.cos(AK_A)*(WORLD_R-4), akz=Math.sin(AK_A)*(WORLD_R-4);
+        const yd = Math.hypot(x-akx, z-akz);
+        if(yd < 14){ const t=1-yd/14; cA.lerp(AK_MUD, Math.min(1, t*1.6)*0.85); }
       }
       cols[v*3]=cA.r; cols[v*3+1]=cA.g; cols[v*3+2]=cA.b;
     }
@@ -3437,6 +3455,95 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- Noah's build-yard (the 'arkyard' biome — Genesis 6): a green working plain the week
+  //      before the rain. Up-screen the great half-planked ark stands over a mud-churned yard
+  //      of felled timber; behind it a slate storm WALL is already rolling in, rain falling in
+  //      gray veils on the far hills and silent lightning turning inside the cloud — while the
+  //      near ground still works in low golden sun. Doves circle the hull; pairs queue to board. ----
+  const AK_MUD = new THREE.Color(0x7a5f42);              // hoof-and-barrow churned yard mud
+  const AK_A = Math.PI*1.25;                             // the ark waits up-screen on the camera diagonal
+  const AK_SLATE = [0x4b5560, 0x3f4a54, 0x57626c, 0x36414b];
+  let akDoves = [], akVeils = [], akBolt = null, akFlash = 0, akFlashT = 4;
+  const akVeilM = new THREE.MeshLambertMaterial({color:0x8a97a2, transparent:true, opacity:0.20, depthWrite:false});
+  function akStump(x,z){
+    const g=new THREE.Group(), s=.55+Math.random()*.35;
+    g.add(part('cylinder',0x7a4b22, 0,.32*s,0, .78*s,.64*s,.78*s));
+    const top=part('cylinder',0xd9b980, 0,.65*s,0, .70*s,.06,.70*s); top.castShadow=false; g.add(top);
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g);
+  }
+  function akLogPile(x,z){
+    const g=new THREE.Group();
+    [[-.55,.32,0],[.55,.32,.1],[0,.9,.05]].forEach(([lx,ly,lz])=>
+      g.add(part('capsule',0x7c5128, lx,ly,lz, .62,1.9,.62, 0,0,Math.PI/2)));
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=true; } });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g);
+  }
+  function akSawhorse(x,z){
+    const g=new THREE.Group();
+    [-1.1,1.1].forEach(px=>{ g.add(part('cylinder',0x8a6a3e, px-.22,.55,0, .12,1.15,.12, 0,0,.35));
+      g.add(part('cylinder',0x8a6a3e, px+.22,.55,0, .12,1.15,.12, 0,0,-.35)); });
+    g.add(box(3.6,.14,.5, 0xc79a5e, .4,1.12,0));                          // the plank being sawn
+    const dust=sph(0xd9b980, .4,.03,.45, .8,.02,.55); dust.castShadow=false; g.add(dust);   // sawdust drift
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g);
+  }
+  function arkyardScenery(){
+    akDoves=[]; akVeils=[]; akFlash=0; akFlashT=3+Math.random()*4;
+    const ax=Math.cos(AK_A)*(WORLD_R-4), az=Math.sin(AK_A)*(WORLD_R-4);   // must match the ark placement in startMission
+    // — the storm wall: a slate cloud rampart ARCED across the diagonal behind the ark, rain
+    //   veils under it. The play camera pitches steeply down, so far scenery is only in frame
+    //   when it sits LOW — the wall rises from the horizon line itself, never floats above it —
+    for(let s=-4;s<=4;s++){
+      const a=AK_A+s*0.155, r=WORLD_R+11+Math.abs(s)*1.8;
+      const cx=Math.cos(a)*r, cz=Math.sin(a)*r, cy=3.6+Math.random()*2.0;
+      for(let k=0;k<3;k++){
+        const c=new THREE.Mesh(ugeo('sphere'), mat(AK_SLATE[(s+4+k)%4]));   // smooth-shaded: billow, not crag
+        const cs=5.5+Math.random()*4.5;
+        c.scale.set(cs*2, cs*1.15, cs*1.4);
+        c.position.set(cx+(k-1)*3.4, cy+(k===1?2.2:0), cz-(k===1?2:0));
+        c.castShadow=false; c.receiveShadow=false; decor.add(c);
+      }
+      if(s%2===0){                                          // rain already falling on the far country
+        const v=new THREE.Mesh(boxGeo, akVeilM);
+        v.scale.set(9,8,.6); v.position.set(cx*0.92, 1.4, cz*0.92); v.rotation.z=0.06; v.rotation.y=-a;
+        v.castShadow=false; v.receiveShadow=false; decor.add(v); akVeils.push(v);
+      }
+    }
+    akBolt=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xeef2ff, transparent:true, opacity:0}));
+    akBolt.scale.set(11,6,7); akBolt.position.set(Math.cos(AK_A)*(WORLD_R+12), 5.0, Math.sin(AK_A)*(WORLD_R+12));
+    akBolt.castShadow=false; decor.add(akBolt);
+    // — the sunny side still holds: soft green hills and two bright clouds off the storm's shoulder —
+    [[WORLD_R+22, 8, 0x6f8a58],[WORLD_R+15, -WORLD_R*0.4, 0x668152],[WORLD_R*0.35, WORLD_R+16, 0x77935e]].forEach(([hx,hz,hc])=>{
+      const h=new THREE.Mesh(ugeo('sphere'), flatMat(hc));
+      h.scale.set(24,7.5,17); h.position.set(hx,-1.4,hz); h.castShadow=false; decor.add(h); });
+    [[WORLD_R+12, 8.5, 4],[WORLD_R+6, 10, 18]].forEach(([cx,cy,cz])=>{
+      const c=new THREE.Mesh(ugeo('sphere'), mat(0xfff2da));
+      c.scale.set(7.5,3.4,4.5); c.position.set(cx,cy,cz); c.castShadow=false; decor.add(c); });
+    // — the working yard: felled timber trades, stumps where trees used to be —
+    // the pond drifts with WORLD_R, so fixed yard props walk down-screen until they sit dry
+    const dry=(x,z)=>{ let t=0; while(inWater(x,z)&&t++<8) z+=2.2; return [x,z]; };
+    const clearOfYard=(x,z)=>Math.hypot(x-ax,z-az)>15;
+    let n=0, guard=0;
+    while(n<6 && guard++<60){ const [x,z]=randPos(3); if(Math.hypot(x,z)>9 && clearOfYard(x,z)){ makeTree(x,z); n++; } }
+    for(let i=0;i<5;i++){ const a=Math.random()*TAU, r=13+Math.random()*6, x=ax+Math.cos(a)*r, z=az+Math.sin(a)*r;
+      if(Math.abs(x)<WORLD_R-2 && z>-WORLD_R+2 && z<WORLD_R-2 && !inWater(x,z)) akStump(x,z); }
+    akLogPile(ax-8.5, az+7.5); akLogPile(...dry(ax+9, az+6));
+    akSawhorse(...dry(ax+6.5, az+10.5));
+    [[ax-7,az+11],[ax-6.1,az+11.6],[ax-7.9,az+10.2]].forEach(([bx,bz])=>{     // pitch barrels (Gen 6:14)
+      const b=part('cylinder',0x4a3626, 0,.62,0, 1.0,1.24,1.0); const t=part('cylinder',0x2c1f16, 0,1.26,0, .88,.08,.88);
+      const gb=new THREE.Group(); gb.add(b,t); t.castShadow=false; gb.position.set(bx,0,bz); decor.add(gb); });
+    const [cx2,cz2]=dry(ax+4.4, az+8.6);
+    const coil=part('torus',0xb98d58, cx2,0.08,cz2, 1.5,1.5,1.5, Math.PI/2,0,0); coil.castShadow=false; decor.add(coil);
+    for(let i=0;i<Math.round(WORLD_R*0.45);i++){ const [x,z]=randPos(1.5); if(clearOfYard(x,z)) makeFlower(x,z); }
+    for(let i=0;i<4;i++){ const [x,z]=randPos(2); if(clearOfYard(x,z)) makeRock(x,z,.5+Math.random()*.6); }
+    // — doves circling the hull, waiting for their window (animated in frame()) —
+    for(let d=0;d<3;d++){
+      const dv=makeDove(); dv.scale.setScalar(1.15);
+      dv.userData.orb={cx:ax-5, cz:az-6, r:7+d*2.2, h:8.5+d*1.3, sp:.45+d*.12, ph:d*2.1};
+      decor.add(dv); akDoves.push(dv);
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -3489,6 +3596,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       hilltownScenery();
     } else if(d==='eden'){
       edenScenery();
+    } else if(d==='arkyard'){
+      arkyardScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3866,21 +3975,79 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     return g;
   }
   function makeArk(){
+    // the ark as Noah is still building it (Genesis 6): a great planked hull lying broadside
+    // across the top of the yard, bow finished, STERN still open ribs under scaffolding — with
+    // the gangway coming down to the group origin, which is where the win-check stands.
     const g = new THREE.Group();
-    g.add(box(8,2.4,4,0x7a4b22,0,1.2,0));            // hull
-    g.add(box(9,.8,4.4,0x8a5a2b,0,2.4,0));           // deck rim
-    g.add(box(5,2,3,0xcaa06a,0,3.6,0));              // cabin
-    g.add(box(5.4,1,3.4,0xc0392b,0,4.7,0));          // roof
-    g.add(box(2.2,.3,3,0x8a5a2b,-5,.5,0));           // ramp
-    g.add(part('capsule', 0x7a4b22, 4.0,1.2,0, 4.4,1.0,4.4, 0,0,Math.PI/2));  // rounded bow
-    g.add(part('capsule', 0x7a4b22,-4.0,1.2,0, 4.4,1.0,4.4, 0,0,Math.PI/2));  // rounded stern
-    [-2.6,-1.0,1.0,2.6].forEach(x=>g.add(sph(0x4a3018,x,1.6,2.02,.22,.22,.05))); // portholes
-    g.add(part('cylinder', 0x6b4423, 0,5.9,0, .08,2.4,.08));      // mast
-    g.add(sph(0xffe14d, 0,7.1,0, .18));                            // lantern
-    const glow = new THREE.PointLight(0xffe14d,0.8,10); glow.position.set(0,7.1,0); g.add(glow);
-    // a rainbow of God's promise (Genesis 9) arcing behind the ark
-    const rColors=[0xff5a5a,0xffb14d,0xffe14d,0x5adf6a,0x5ab6ff,0x8a6bd8];
-    rColors.forEach((c,i)=>{ const rad=3.4-i*.34; g.add(part('arc', c, 0, 2.6, -3.5-i*.05, rad,rad,rad)); });
+    const HZ=-8.2;                                   // hull centerline, up-screen of the ramp foot
+    // — planked hull: long rounded strakes stacked with a real belly — each course carries its
+    //   own half-beam so the ship swells amidships and tucks in at keel and sheer —
+    [ [0.55, 8.6, .75, 1.90, 0x3d2b1c],              // tarred garboard course at the waterline-to-be
+      [1.30, 9.4, .86, 2.65, 0x6e4522],
+      [2.10,10.0, .92, 3.15, 0x7c5128],
+      [2.92,10.3, .92, 3.30, 0x8a5c2e],
+      [3.68,10.1, .82, 3.05, 0x936239],
+    ].forEach(([y,hl,r,hb,c])=>g.add(part('capsule', c, .8, y, HZ, r*2, hl, hb*2, 0,0,Math.PI/2)));
+    g.add(box(17.6,.44,6.2, 0x9c6b3a, .8,4.14,HZ));                       // main deck
+    [-1,1].forEach(sd=>g.add(box(18.2,.34,.38, 0x7a4b22, .8,4.52,HZ+sd*3.05)));   // gunwale rails
+    // — deckhouse with the "window" course under a pitched timber roof (Gen 6:16) —
+    g.add(box(9.6,1.9,3.9, 0xa9743c, 1.6,5.35,HZ));
+    g.add(box(9.7,.34,4.0, 0xf2dfae, 1.6,6.10,HZ));                       // pale window band, all the way round
+    const r1=box(2.6,.26,4.5, 0x8f4a30, .55,6.85,HZ); r1.rotation.z=.5;
+    const r2=box(2.6,.26,4.5, 0x7f4029, 2.65,6.85,HZ); r2.rotation.z=-.5;
+    g.add(r1,r2, box(9.9,.22,.5, 0x6b3520, 1.6,7.32,HZ));                 // roof planes + ridge beam
+    // — the door in the side (Gen 6:16), warm lamplight welling out, ramp rising to meet it —
+    const DZ=HZ+3.62;
+    const doorGlow=new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({color:0xffca7a}));
+    doorGlow.scale.set(2.2,2.5,.25); doorGlow.position.set(0,3.60,DZ); doorGlow.castShadow=false; g.add(doorGlow);
+    [-1.25,1.25].forEach(px=>g.add(box(.34,3.1,.4, 0x5c3a1e, px,3.75,DZ)));       // jambs
+    g.add(part('cylinder',0x5c3a1e, 0,5.28,DZ, 2.85,.42,2.85, Math.PI/2,0,0));    // arched lintel
+    const lamp=new THREE.PointLight(0xffbf74, 1.1, 11); lamp.position.set(0,3.7,DZ+1.2); g.add(lamp);
+    g.userData.glow=lamp;                            // frame() breathes it like a live flame
+    // — gangway: a broad cleated plank walk from the yard floor up to the door —
+    const ramp=new THREE.Group(); ramp.position.set(0,1.42,-1.35); ramp.rotation.x=0.462;
+    ramp.add(box(3.1,.28,6.4, 0x8a5c2e, 0,0,0));
+    for(let k=-2;k<=2;k++) { const cl=box(2.8,.12,.3, 0x6e4522, 0,.20,k*1.18); cl.castShadow=false; ramp.add(cl); }
+    [-1.62,1.62].forEach(px=>{ const rl=box(.16,.42,6.4, 0x7a4b22, px,.30,0); rl.castShadow=false; ramp.add(rl); });
+    g.add(ramp);
+    // — the unfinished stern: planking gives way to bare bent ribs over the keel —
+    for(let k=0;k<5;k++){ const rx=-9.6-k*1.15, sc=6.6-k*0.42;
+      const rib=part('arc', 0xb98d58, rx, 0.62, HZ, sc,sc,sc, 0, Math.PI/2, 0);
+      rib.castShadow=false; g.add(rib); }
+    g.add(box(6.4,.5,.8, 0x3d2b1c, -12.2,.55,HZ));                        // exposed keel timber
+    // — scaffolding hugging the open end: lashed poles, walk-boards, a plank on the hoist —
+    [[-9.2,HZ-3.6],[-14.6,HZ-3.6],[-9.2,HZ+3.6],[-14.6,HZ+3.6]].forEach(([px,pz])=>{
+      const pole=part('cylinder',0x8a6a3e, px,2.7,pz, .22,5.4,.22); pole.castShadow=false; g.add(pole); });
+    [1.9,3.9].forEach(wy=>[-1,1].forEach(sd=>{ const wb=box(6.2,.16,.62, 0xc79a5e, -11.9,wy,HZ+sd*3.6);
+      wb.castShadow=false; g.add(wb); }));
+    const beam=part('cylinder',0x8a6a3e, -11.9,5.4,HZ, .18,7.8,.18, Math.PI/2,0,0); beam.castShadow=false; g.add(beam);
+    const hoist=new THREE.Group(); hoist.position.set(-11.9,5.4,HZ);      // windify swings it from the beam
+    [-0.9,0.9].forEach(hx=>{ const rp=part('cylinder',0xd9c49a, hx,-1.05,0, .05,2.1,.05); rp.castShadow=false; hoist.add(rp); });
+    const hp=box(2.6,.16,.6, 0xc79a5e, 0,-2.1,0); hp.castShadow=false; hoist.add(hp);
+    windify(hoist, 0.05); g.add(hoist);
+    // — two by two: pairs already waiting at the foot of the gangway, and sheep on the walk —
+    const qs=[['elephant', 3.6,2.4,-.35],['elephant', 5.5,3.3,-.15],
+              ['giraffe', -3.9,3.2, .40],['giraffe', -5.3,4.4, .22]];
+    qs.forEach(([tp,qx,qz,tw])=>{ const an=makeAnimal(tp); an.position.set(qx,0,qz);
+      an.rotation.y=Math.PI+tw; g.add(an); });
+    [-0.62,0.62].forEach((sx,i)=>{ const sh=makeAnimal('sheep');
+      sh.position.set(sx, 1.76-i*0.57, -1.7+i*1.15);                      // partway up the plank
+      sh.rotation.order='YXZ'; sh.rotation.set(-0.462, Math.PI+(i?0.10:-0.06), 0); g.add(sh); });
+    // — a dove of hope resting on the ridge —
+    const dv=makeDove(); dv.position.set(3.4,7.45,HZ); dv.rotation.y=2.6; g.add(dv);
+    return g;
+  }
+  // a small white dove (perched or circling — the circling ones flap via userData.wings)
+  function makeDove(){
+    const g=new THREE.Group(), W=0xf7f5ee;
+    g.add(sph(W,0,.16,0,.16,.14,.22));                                    // body
+    g.add(sph(W,0,.30,.16,.10));                                          // head
+    g.add(sph(0xe8a03c,0,.28,.26,.035,.03,.06));                          // beak
+    g.add(sph(0x2a2320,-.045,.32,.22,.022), sph(0x2a2320,.045,.32,.22,.022));
+    const tl=sph(0xe9e6da,0,.16,-.24,.06,.03,.14); tl.rotation.x=.4; g.add(tl);
+    g.userData.wings=[-1,1].map(sd=>{ const p=pivotAt(sd*.10,.22,0);
+      p.add(sph(0xefede4, sd*.16,0,-.02, .20,.03,.12)); g.add(p); return p; });
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
     return g;
   }
   function makeStable(){
@@ -4432,6 +4599,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const KEMET  =[0xdfc188,0xd3b478,0xe9d09a,0xc7a668];   // Nile-valley earth gold with threshing dust — the years of plenty (egypt biome)
   const TERRA  =[0xcabb8e,0xbfae7f,0xd6c79c,0xa4a370];   // swept hill-town courtyard earth with sage tufts in the shade (hilltown biome)
   const EDENG  =[0x46b452,0x3ca24a,0x58c25e,0x2f9440];   // rain-fresh paradise green, deeper and richer than any field since (eden biome)
+  const AK_G   =[0x55b154,0x49a04b,0x62bd5f,0x3e9245];   // storm-lit working green — turf gone vivid under the coming rain (arkyard biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -4444,7 +4612,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'noah', name:"Noah's Ark", emoji:'🐘', type:'gather', base:6, reachLabel:'the ark ⛵',
       goal:'Round up the animals and lead them to the ark!',
       verse:'“Two of every kind… will come to you to be kept alive.” — Genesis 6:20',
-      env:{ ground:GREEN, water:'pond', sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:AK_G, water:'pond', sky:0xc3b191, fogNear:46, fogFar:96, decor:'arkyard' } },
     { id:'abram', name:'Abraham Counts the Stars', emoji:'✨', type:'collect', base:9, item:'starbit',
       goal:'God promised Abraham a family as many as the stars! Gather the fallen starlight!',
       verse:'“Look up at the sky and count the stars—if indeed you can count them… So shall your offspring be.” — Genesis 15:5',
@@ -4669,8 +4837,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         an.position.set(x,0,z); an.userData.kind='animal'; an.userData.caught=false; an.userData.type=tp;
         an.userData.vx=Math.random()*2-1; an.userData.vz=Math.random()*2-1; an.userData.turnT=Math.random()*2; critters.add(an); }
       if(mission.id==='noah'){
-        const ark=makeArk(); ark.position.set(0,0,-WORLD_R+5); props.add(ark); missionCtx.goalObj=ark;
-        const noah=makeNPC('noah'); noah.position.set(4,0,-WORLD_R+6); noah.rotation.y=2.4; props.add(noah);
+        // the ark waits up the CAMERA DIAGONAL (like the kiln and the fish's mouth) so the hull
+        // fills the view as the child walks toward it, storm wall rising behind
+        const agR=WORLD_R-4, agx=Math.cos(AK_A)*agR, agz=Math.sin(AK_A)*agR;
+        const ark=makeArk(); ark.position.set(agx,0,agz); ark.rotation.y=Math.PI/4; props.add(ark); missionCtx.goalObj=ark;
+        const noah=makeNPC('noah'); noah.position.set(agx+0.2,0,agz+4.3); noah.rotation.y=1.28; props.add(noah);   // overseeing the boarding line, clear of the gangway
       } else { // Garden of Eden — bring them to Adam to be named
         const adam=makeNPC('adam'); adam.position.set(0,0,-WORLD_R+5); props.add(adam); missionCtx.goalObj=adam;
       }
@@ -5464,6 +5635,28 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         tb.userData.glow.intensity=1.6*br;
         tb.userData.halo.material.opacity=0.30*br;
       }
+    }
+    // ---- arkyard biome: doves circle the hull, far rain drifts, lightning turns inside the storm wall ----
+    if(currentEnv && currentEnv.decor==='arkyard'){
+      for(const dv of akDoves){ const d=dv.userData.orb, a=T*d.sp+d.ph;
+        dv.position.set(d.cx+Math.cos(a)*d.r, d.h+Math.sin(T*1.3+d.ph)*0.5, d.cz+Math.sin(a)*d.r);
+        dv.rotation.y = -a;                                  // nose (at +z) leads around the circle
+        const fl=Math.sin(T*9+d.ph)*0.55;                    // wingbeat
+        dv.userData.wings[0].rotation.z =  fl; dv.userData.wings[1].rotation.z = -fl;
+      }
+      for(let i=0;i<akVeils.length;i++){ const v=akVeils[i];
+        v.rotation.z = 0.06+Math.sin(T*0.4+i*2.1)*0.03;      // rain curtains lean with the far wind
+        v.material.opacity = 0.20+Math.sin(T*0.6+i)*0.04;
+      }
+      if(akBolt){ akFlashT -= dt;
+        if(akFlashT<=0){ akFlash=1; akFlashT=5+Math.random()*9;
+          const ba=AK_A+(Math.random()*2-1)*0.5, br=WORLD_R+11;      // somewhere else along the cloud wall
+          akBolt.position.x=Math.cos(ba)*br; akBolt.position.z=Math.sin(ba)*br; }
+        if(akFlash>0){ akFlash=Math.max(0, akFlash-dt*3.2);
+          akBolt.material.opacity = akFlash*(Math.sin(akFlash*26)>0?0.55:0.16); }   // a double pulse, far off and silent
+      }
+      const ak=missionCtx&&missionCtx.goalObj;
+      if(ak&&ak.userData.glow){ ak.userData.glow.intensity = 1.1*(1+Math.sin(T*1.6)*0.15+Math.sin(T*4.1)*0.06); }
     }
     // ---- furnace biome: sparks climb the dark, ember pits breathe, the kiln mouth roars ----
     if(currentEnv && currentEnv.decor==='furnace'){
