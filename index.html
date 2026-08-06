@@ -423,6 +423,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       starField.visible = false; clouds.visible = true;
       return;
     }
+    if(currentEnv && currentEnv.decor==='nightwild'){
+      // the open country where God meets people in the dark (Gen 15, Gen 28, 1 Sam 3, Judg 7):
+      // a clear high-desert night — the silver key comes from the risen moon's own corner of
+      // the sky so every juniper and standing stone throws one long moon-shadow, a deep
+      // indigo skylight fills the shadows, and the campfire's warmth reads against the cold
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x0b1330), 0.40), near||40, far||88);
+      starField.visible = true; clouds.visible = false;
+      sun.intensity = 0.62; sun.color.set(0xc4d6ff);
+      sun.position.set(-40, 28, -17);              // under the golden moon — long silver shadows
+      hemi.color.set(0x2c3e6c); hemi.groundColor.set(0x10182a); hemi.intensity = 0.74;
+      ambLight.color.set(0xa2b6e6); ambLight.intensity = 0.15;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='pasture' && !night){
       // shepherd-country afternoon (Psalm 23): the sun swung low toward the down-screen
       // side so every hedgerow, fold-stone and woolly back wears a golden rim and throws
@@ -863,6 +876,37 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const rr=WORLD_R*2.8+Math.random()*10, w=18+Math.random()*12;
         const rg=new THREE.Mesh(sphG, farM); rg.scale.set(w, 5+Math.random()*4, w*0.8);
         rg.position.set(Math.cos(a)*rr, -2, Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
+        rg.castShadow=false; groundGroup.add(rg);
+      }
+    } else if(env.horizon==='nighthills'){
+      // the sleeping wilderness: a near ring of moon-backed ridges reading dark against the
+      // stars, a far ring melting into the night haze — and out on the slopes, a scatter of
+      // tiny watch-fire embers from far-off camps keeping the same night watch (for Gideon
+      // they are the Midianite camp "thick as locusts" in the valley — Judges 7:12)
+      const hazeN=new THREE.Color(env.sky||0x121a38);
+      const nearM=new THREE.MeshLambertMaterial({color:0x2c3c50});
+      const farM =new THREE.MeshLambertMaterial({color:new THREE.Color(0x36486a).lerp(hazeN,0.45)});
+      const fireM=new THREE.MeshBasicMaterial({color:0xffb26a, fog:false});   // embers pierce the haze
+      const hillGeoN=new THREE.SphereGeometry(1,12,8);
+      for(let i=0;i<10;i++){
+        const a=i/10*TAU+Math.random()*0.3, rr=WORLD_R*2.1+Math.random()*8;
+        const w=13+Math.random()*8, h=3.4+Math.random()*2.6;
+        const hm=new THREE.Mesh(hillGeoN, nearM); hm.scale.set(w,h,w*(0.8+Math.random()*0.25));
+        hm.position.set(Math.cos(a)*rr,-1.6,Math.sin(a)*rr); hm.rotation.y=Math.random()*TAU;
+        hm.castShadow=false; groundGroup.add(hm);
+        if(i%2===0){                               // an ember or two on each far slope's shoulder
+          for(let k=0,kn=1+(i%4===0?1:0);k<kn;k++){
+            const f=new THREE.Mesh(hillGeoN, fireM); f.scale.set(0.5,0.38,0.5);
+            const fr=rr-w*(0.45+Math.random()*0.25), fa=a+(Math.random()-.5)*0.14;
+            f.position.set(Math.cos(fa)*fr, 0.8+Math.random()*(h*0.5), Math.sin(fa)*fr);
+            f.castShadow=false; groundGroup.add(f);
+          }
+        }
+      }
+      for(let i=0;i<7;i++){                        // far ridges sunk into the night haze
+        const a=(i+0.5)/7*TAU+Math.random()*0.35, rr=WORLD_R*2.8+Math.random()*10, w=18+Math.random()*12;
+        const rg=new THREE.Mesh(hillGeoN, farM); rg.scale.set(w,5+Math.random()*4,w*0.8);
+        rg.position.set(Math.cos(a)*rr,-2,Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
         rg.castShadow=false; groundGroup.add(rg);
       }
     } else if(env.interior){
@@ -2797,6 +2841,112 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- Night wilderness (the 'nightwild' biome — the open country where God meets people
+  //      in the dark: Abram counting stars (Genesis 15), Jacob's stone-pillow camp at Bethel
+  //      (Genesis 28), the night the lamp still burned at Shiloh (1 Samuel 3), Gideon's three
+  //      hundred above the sleeping valley (Judges 7). Moon-silvered steppe: wind-bent
+  //      junipers and bare snags standing against the stars, pale limestone catching the
+  //      moon, seed-grass gone silver, one warm traveler's camp — black goat-hair tent,
+  //      embers, real firelight — and fireflies adrift over the grass.) ----
+  let nwFlies=[], nwFire=null;
+  const NW_STONE=[0x8b95a2,0x7e8894,0x99a3ae,0x717b88];    // moon-washed limestone
+  function nwJuniper(x,z){
+    // a wind-bent juniper reading blue-green in the moonlight
+    const g=new THREE.Group();
+    const s=.7+Math.random()*.5, lean=(Math.random()-.5)*.5, JG=[0x31504a,0x3a5c52,0x2b463f];
+    g.add(part('robe',0x4c3b2b, lean*1.2,1.1*s,0, .38*s,2.2*s,.38*s, 0,0,lean));
+    g.add(sph(JG[0], lean*2.6, 2.5*s, 0, 1.25*s,.72*s,1.15*s));
+    g.add(sph(JG[1], lean*2.6+.6*s, 3.1*s, .2*s, .85*s,.5*s,.8*s));
+    g.add(sph(JG[2], lean*2.6-.7*s, 2.15*s, -.3*s, .8*s,.45*s,.75*s));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.02); decor.add(g); return g;
+  }
+  function nwSnag(x,z){
+    // a bare dead snag — the silhouette that reads "wilderness" against the stars
+    const g=new THREE.Group(), C=0x3f332a, lean=(Math.random()-.5)*.4;
+    g.add(part('robe',C, lean*1.4,1.5,0, .30,3.0,.30, 0,0,lean));
+    g.add(part('cylinder',C, lean*2.6+.7,2.9,.1, .09,1.5,.09, 0,0,-1.0));
+    g.add(part('cylinder',C, lean*2.6-.6,2.5,-.1, .08,1.2,.08, 0,0,1.1));
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.receiveShadow=true; } });
+    g.children[0].castShadow=true;                          // only the trunk throws a moon-shadow
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function nwOutcrop(x,z,s){
+    // pale limestone standing stones — the moon finds them first (Bethel stone country)
+    const g=new THREE.Group();
+    const n=2+Math.floor(Math.random()*2);
+    for(let i=0;i<n;i++){
+      const c=new THREE.Mesh(ugeo('boulder'), flatMat(NW_STONE[Math.floor(Math.random()*4)]));
+      const h=.9+Math.random()*1.1, w=.8+Math.random()*.7;
+      c.scale.set(w, h, w*(0.7+Math.random()*.5));
+      c.position.set((Math.random()-.5)*1.4, h*0.42, (Math.random()-.5)*1.4);
+      c.rotation.set((Math.random()-.5)*.3, Math.random()*TAU, (Math.random()-.5)*.3);
+      c.castShadow = i===0; c.receiveShadow=true; g.add(c);
+    }
+    const sl=new THREE.Mesh(ugeo('blob'), flatMat(NW_STONE[Math.floor(Math.random()*4)]));
+    sl.scale.set(1.0+Math.random()*.5, .4, .8+Math.random()*.4);
+    sl.position.set((Math.random()-.5)*1.6, .16, (Math.random()-.5)*1.6);
+    sl.rotation.y=Math.random()*TAU; sl.castShadow=false; sl.receiveShadow=true; g.add(sl);
+    g.scale.multiplyScalar(s||1); g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g); return g;
+  }
+  function nwTuft(x,z){
+    // seed-grass gone silver in the moonlight
+    const g=new THREE.Group(), c=[0x9caf92,0x8ba184,0xa9bba0];
+    for(let i=0;i<3;i++){
+      const px=(Math.random()-.5)*.5, pz=(Math.random()-.5)*.5;
+      g.add(conePart(c[i%3], px,.32+Math.random()*.14,pz, .09,.64+Math.random()*.26, (Math.random()-.5)*.5,0,(Math.random()-.5)*.5));
+    }
+    g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.05); decor.add(g); return g;
+  }
+  function nwCamp(x,z){
+    // the traveler's camp: a low black goat-hair tent, a bedroll, and a watch-fire whose
+    // real light pools warm on the cold silver turf — the one hearth in the whole night
+    const ry=Math.atan2(-x,-z);                             // tent mouth open toward the field
+    const tent=new THREE.Group();
+    tent.add(part('pyr4',0x2c2620, 0,.95,0, 3.4,1.9,2.8, 0,Math.PI/4,0));       // dark tent canopy
+    tent.add(part('pyr4',0x3a332b, 0,1.02,-.1, 2.9,1.75,2.4, 0,Math.PI/4,0));   // lighter ridge panel
+    tent.add(part('cylinder',0x6a5638, 1.05,.55,1.05, .07,1.15,.07, .2,0,-.2)); // guy poles
+    tent.add(part('cylinder',0x6a5638, -1.05,.55,1.05, .07,1.15,.07, .2,0,.2));
+    tent.add(sph(0x7a6647, .4,.16,1.5, .55,.14,.34));       // bedroll at the door
+    tent.position.set(x,0,z); tent.rotation.y=ry; decor.add(tent);
+    const ux=Math.sin(ry), uz=Math.cos(ry);                 // out the tent door
+    const fx=x+ux*3.1, fz=z+uz*3.1;
+    const g=new THREE.Group();
+    for(let i=0;i<5;i++){ const a=i/5*TAU; const st=new THREE.Mesh(ugeo('blob'), flatMat(NW_STONE[i%4]));
+      st.position.set(Math.cos(a)*.9,.13,Math.sin(a)*.9); st.scale.set(.42,.28,.38);
+      st.rotation.y=a; st.castShadow=false; st.receiveShadow=true; g.add(st); }
+    g.add(part('cylinder',0x4c3620, 0,.22,0, .12,1.2,.12, Math.PI/2,.5,0));
+    g.add(part('cylinder',0x3e2c1a, 0,.26,0, .12,1.2,.12, Math.PI/2,-.6,0));
+    const fl=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffa347}));
+    fl.position.y=.76; fl.scale.set(.46,.84,.46); g.add(fl);
+    const core=new THREE.Mesh(ugeo('cone'), new THREE.MeshBasicMaterial({color:0xffe1a0}));
+    core.position.y=.70; core.scale.set(.23,.48,.23); g.add(core);
+    const halo=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xffb060, transparent:true, opacity:.22}));
+    halo.position.y=.84; halo.scale.setScalar(1.2); g.add(halo);
+    g.position.set(fx,0,fz); windify(g,.03); decor.add(g);
+    const pool=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xff8438, transparent:true, opacity:.20}));
+    pool.position.set(fx,.05,fz); pool.scale.set(2.6,.02,2.2); pool.castShadow=false; decor.add(pool);
+    const light=new THREE.PointLight(0xffa050, 1.5, 11);    // the night's one warm light
+    light.position.set(fx,1.2,fz); decor.add(light);
+    nwFire={light, halo, pool};
+  }
+  function nightwildScenery(){
+    nwFlies=[]; nwFire=null;
+    const W=WORLD_R;
+    nwCamp(W*0.30, W*0.24);                                 // camp down-screen, clear of goals and NPCs
+    for(let i=0,n=Math.round(W*0.30);i<n;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) nwJuniper(x,z); }
+    for(let i=0;i<3;i++){ const [x,z]=randPos(4); if(Math.hypot(x,z)>9) nwSnag(x,z); }
+    for(let i=0,n=Math.round(W*0.22);i<n;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>7) nwOutcrop(x,z, .8+Math.random()*.6); }
+    for(let i=0,n=Math.round(W*0.6);i<n;i++){ const [x,z]=randPos(1.5); if(Math.hypot(x,z)>4) nwTuft(x,z); }
+    for(let i=0;i<4;i++){ const [x,z]=randPos(2); if(Math.hypot(x,z)>6) makeScrub(x,z); }
+    for(let i=0;i<12;i++){                                  // fireflies adrift over the grass
+      const f=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:0xd8ffa0, transparent:true, opacity:.6, fog:false}));
+      const [x,z]=randPos(2);
+      f.userData={cx:x, cz:z, r:1.5+Math.random()*2.5, h:.6+Math.random()*1.1, sp:.25+Math.random()*.3, ph:Math.random()*TAU};
+      f.scale.setScalar(.08); f.castShadow=false; decor.add(f); nwFlies.push(f);
+    }
+  }
+
   // ---- Egypt granary-country decor (the 'egypt' biome — Genesis 41:49: "Joseph stored up
   //      huge quantities of grain, like the sand of the sea"). One glance should say BOTH
   //      "Egypt" (pyramids on the horizon, obelisks, glyph walls, a guardian sphinx, date
@@ -3138,7 +3288,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
     const env = currentEnv || {}, d = env.decor || 'forest';
-    ambient.visible = !env.interior && d!=='furnace';   // no butterflies in the temple — or over the coals of Dura
+    ambient.visible = !env.interior && d!=='furnace' && d!=='nightwild';   // no butterflies in the temple, over the coals of Dura — or after dark (fireflies keep that watch)
     const nT=Math.round(WORLD_R*0.55), nR=Math.round(WORLD_R*0.4), nF=Math.round(WORLD_R*0.8);
     if(d==='desert'){
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -3176,6 +3326,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       pastureScenery();
     } else if(d==='canyon'){
       canyonScenery();
+    } else if(d==='nightwild'){
+      nightwildScenery();
     } else if(d==='egypt'){
       egyptScenery();
     } else if(d==='hilltown'){
@@ -4106,6 +4258,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const DEWG  = [0x559e60,0x4c935a,0x63aa68,0x468655];   // dew-cool Easter-dawn garden green (tomb biome)
   const SAND  = [0xe6d3a0,0xdec994,0xecdcac,0xd8c489];
   const NIGHT_G = [0x2f7a3a,0x357f40,0x2a7136,0x316f3a];
+  const NW_G  = [0x5c7263,0x526857,0x667c6c,0x49604f];   // moon-silvered steppe turf (night wilderness)
   const FIELD = [0xd6c06a,0xcab55f,0xe0ca78,0xbfa851];   // ripe harvest field (Ruth)
   const COBBLE= [0xcfc2a8,0xc4b596,0xd9ccb2,0xb9aa8b];   // worn limestone street (Jerusalem / Susa)
   const MARBLE= [0xe7dab8,0xdccfa9,0xefe4c6,0xd2c39a];   // polished temple pavement, lamp-warmed
@@ -4139,11 +4292,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'abram', name:'Abraham Counts the Stars', emoji:'✨', type:'collect', base:9, item:'starbit',
       goal:'God promised Abraham a family as many as the stars! Gather the fallen starlight!',
       verse:'“Look up at the sky and count the stars—if indeed you can count them… So shall your offspring be.” — Genesis 15:5',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:NW_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'nightwild', horizon:'nighthills', night:true } },
     { id:'ladder', name:"Jacob's Ladder", emoji:'🪜', type:'reach',
       goal:'Jacob dreamed of a stairway to heaven! Walk to the shining stairs!',
       verse:'“He saw a stairway resting on the earth… and the angels of God were ascending and descending on it.” — Genesis 28:12',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:NW_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'nightwild', horizon:'nighthills', night:true } },
     { id:'joseph', name:'Joseph Stores the Grain', emoji:'🏺', type:'collect', base:9, item:'grain',
       goal:'Help wise Joseph store up grain in Egypt before the famine comes!',
       verse:'“Joseph stored up huge quantities of grain, like the sand of the sea.” — Genesis 41:49',
@@ -4159,7 +4312,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'samuel', name:'Samuel Hears God', emoji:'🕯️', type:'reach',
       goal:'God called little Samuel in the night! Walk to the glowing lamp in God’s house!',
       verse:'“Then Samuel said, ‘Speak, for your servant is listening.’” — 1 Samuel 3:10',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:NW_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'nightwild', horizon:'nighthills', night:true } },
     { id:'stones', name:"David's 5 Stones", emoji:'🪨', type:'collect', base:5, fixed:5, item:'stone',
       goal:'Gather 5 smooth stones by the stream.',
       verse:'“He chose five smooth stones from the stream.” — 1 Samuel 17:40',
@@ -4191,7 +4344,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'gideon', name:"Gideon's Trumpets", emoji:'🎺', type:'collect', base:8, item:'horn',
       goal:'God helped Gideon with just 300 helpers! Gather trumpets for his brave band in the night!',
       verse:'“The three companies blew the trumpets… they shouted, ‘A sword for the Lord and for Gideon!’” — Judges 7:20',
-      env:{ ground:NIGHT_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'forest', night:true } },
+      env:{ ground:NW_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'nightwild', horizon:'nighthills', night:true } },
     { id:'ruth', name:'Ruth Gleans the Grain', emoji:'🌾', type:'collect', base:8, item:'grain',
       goal:'Be kind and hard-working like Ruth — glean the golden grain!',
       verse:'“May you be richly rewarded by the Lord… under whose wings you have come to take refuge.” — Ruth 2:12',
@@ -5198,6 +5351,21 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const gr=(d.y-d.y0)/(d.top-d.y0);
         p.position.set(d.x+Math.sin(T*.5+d.ph)*(.15+gr*.9)+gr*1.4, d.y, d.z+Math.cos(T*.45+d.ph)*(.12+gr*.7)+gr*1.0);
         p.scale.setScalar(d.s0*(.5+gr*1.5));                       // thinning off downwind toward the town
+      }
+    }
+    // ---- night wilderness: fireflies wander and pulse on their own clocks; the camp's fire breathes ----
+    if(currentEnv && currentEnv.decor==='nightwild'){
+      for(const f of nwFlies){ const d=f.userData;
+        const a=T*d.sp+d.ph;
+        f.position.set(d.cx+Math.cos(a)*d.r+Math.sin(T*0.7+d.ph*3)*0.7, d.h+Math.sin(T*1.1+d.ph*2)*0.45, d.cz+Math.sin(a)*d.r);
+        const pulse=Math.max(0, Math.sin(T*1.5+d.ph*5));       // glow… fade… dark… glow
+        f.material.opacity=0.12+pulse*0.8;
+        f.scale.setScalar(0.05+pulse*0.06);
+      }
+      if(nwFire){ const br=1+Math.sin(T*2.3)*0.16+Math.sin(T*6.1)*0.08;   // a live fire, never strobing
+        nwFire.light.intensity=1.5*br;
+        nwFire.halo.material.opacity=0.22*br;
+        nwFire.pool.material.opacity=0.20*br;
       }
     }
     // ---- canyon biome: the hawks wheel on the thermals, banked into their slow circles ----
