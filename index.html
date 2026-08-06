@@ -461,6 +461,19 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       ambLight.color.set(0xfff0d4); ambLight.intensity = 0.26;
       return;
     }
+    if(currentEnv && currentEnv.decor==='elah'){
+      // the morning of the challenge (1 Samuel 17:20): low early sun raking ALONG the valley
+      // from the brook's open end, so the water glitters, every terebinth and tent throws its
+      // shadow ACROSS the frame, and Goliath stands rim-lit against the far ridge — with a
+      // dry-gold bounce off the sun-cured summer grass keeping the shadows warm
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xf0dcae), 0.34), near||50, far||100);
+      starField.visible = false; clouds.visible = true;
+      sun.intensity = 1.25; sun.color.set(0xffe2a4);
+      sun.position.set(30, 20, -24);               // down the +u end of the brook — light slides along the water
+      hemi.color.set(0xd6e6f2); hemi.groundColor.set(0x9c8f56); hemi.intensity = 0.82;
+      ambLight.color.set(0xffe9c4); ambLight.intensity = 0.26;
+      return;
+    }
     if(currentEnv && currentEnv.decor==='canyon'){
       // the lonely wilderness road (Jericho, Gaza, Damascus): one hard warm sun swung well to
       // the side, so every mesa, hoodoo and acacia rakes a long shadow ACROSS the road — hard
@@ -660,6 +673,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const akx=Math.cos(AK_A)*(WORLD_R-4), akz=Math.sin(AK_A)*(WORLD_R-4);
         const yd = Math.hypot(x-akx, z-akz);
         if(yd < 14){ const t=1-yd/14; cA.lerp(AK_MUD, Math.min(1, t*1.6)*0.85); }
+      }
+      if(env.decor==='elah'){                                      // the valley floor stays green by the
+        const wv=Math.abs((x+z)*0.7071);                           // brook; both slopes cure to summer gold
+        if(wv<4.6) cA.lerp(EL_LUSH,(1-wv/4.6)*0.45);
+        else if(wv>7) cA.lerp(EL_SLOPE, Math.min(1,(wv-7)/15)*0.6);
       }
       cols[v*3]=cA.r; cols[v*3+1]=cA.g; cols[v*3+2]=cA.b;
     }
