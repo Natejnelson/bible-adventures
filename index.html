@@ -116,7 +116,20 @@
   /* Win card */
   #winCard { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center;
     background: rgba(10,20,40,.55); padding: 16px; }
-  #winCard.show { display: flex; }
+  #winCard.show { display: flex; animation: winScrim .34s ease-out both; }
+  /* the scrim washes in and the card lands with a little overshoot, so winning reads as an
+     ARRIVAL instead of a dialog appearing. Kept as rAF-free CSS on a one-shot element — the
+     in-world confetti still has to be rAF-driven (automation freezes keyframe timelines). */
+  @keyframes winScrim { from { background: rgba(10,20,40,0); } to { background: rgba(10,20,40,.55); } }
+  @keyframes winPop {
+    0%   { transform: scale(.82) translateY(18px); opacity: 0; }
+    62%  { transform: scale(1.03) translateY(0);   opacity: 1; }
+    100% { transform: scale(1) translateY(0);      opacity: 1; }
+  }
+  #winCard.show .winInner { animation: winPop .42s cubic-bezier(.22,1.1,.36,1) both; animation-delay: .06s; }
+  @media (prefers-reduced-motion: reduce) {
+    #winCard.show, #winCard.show .winInner { animation: none; }
+  }
   .winInner { background: #fff; border-radius: 26px; padding: 22px 20px; max-width: 420px; width: 100%;
     text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
   .winH { font-size: 26px; font-weight: 900; color: #2ba341; }
@@ -468,10 +481,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       // dry-gold bounce off the sun-cured summer grass keeping the shadows warm
       scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xf0dcae), 0.34), near||50, far||100);
       starField.visible = false; clouds.visible = true;
-      sun.intensity = 1.25; sun.color.set(0xffe2a4);
+      sun.intensity = 1.42; sun.color.set(0xffe7b2);
       sun.position.set(30, 20, -24);               // down the +u end of the brook — light slides along the water
-      hemi.color.set(0xd6e6f2); hemi.groundColor.set(0x9c8f56); hemi.intensity = 0.82;
-      ambLight.color.set(0xffe9c4); ambLight.intensity = 0.26;
+      hemi.color.set(0xdeeaf4); hemi.groundColor.set(0xb0a068); hemi.intensity = 0.95;
+      ambLight.color.set(0xffeed0); ambLight.intensity = 0.34;
       return;
     }
     if(currentEnv && currentEnv.decor==='canyon'){
@@ -924,6 +937,37 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const rr=WORLD_R*2.8+Math.random()*10, w=18+Math.random()*12;
         const rg=new THREE.Mesh(sphG, farM); rg.scale.set(w, 5+Math.random()*4, w*0.8);
         rg.position.set(Math.cos(a)*rr, -2, Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
+        rg.castShadow=false; groundGroup.add(rg);
+      }
+    } else if(env.horizon==='elah'){
+      // 1 Samuel 17:3 as a piece of composition: TWO facing ridges, one up-screen and one
+      // down-screen, with the valley (and the brook) running between them. They are built as
+      // long low domes strung ALONG the valley axis rather than a ring of hills, so the frame
+      // reads as a corridor with two sides — the shape of a standoff — instead of a clearing.
+      const hazeE=new THREE.Color(env.sky||0xdfe7ee);
+      const nearE=new THREE.MeshLambertMaterial({color:0xcbbe86});                       // sun-cured near slopes
+      const farE =new THREE.MeshLambertMaterial({color:new THREE.Color(0x8d9a72).lerp(hazeE,0.42)});
+      const hillGeoE=new THREE.SphereGeometry(1,14,9);
+      [-1,1].forEach(side=>{
+        for(let i=0;i<7;i++){
+          const u=-WORLD_R*2.4 + i*(WORLD_R*4.8/6) + (Math.random()-.5)*7;
+          // distance is tuned to the PLAY camera, not to a map view: much past ~2.2 WORLD_R
+          // these fall off the top edge entirely and you have paid for geometry nobody sees,
+          // much nearer and they read as a dark wall. Keeping them pale and sunlit is what
+          // makes them a far slope instead of a barrier.
+          const s=side*(WORLD_R*2.15 + Math.random()*8);
+          const [hx,hz]=elPt(u,s);
+          const w=19+Math.random()*12, h=4.2+Math.random()*2.4;
+          const hm=new THREE.Mesh(hillGeoE, nearE);
+          hm.scale.set(w,h,w*0.72); hm.position.set(hx,-2.4,hz);
+          hm.rotation.y=Math.atan2(1,-1);                  // long axis lies ALONG the valley
+          hm.castShadow=false; groundGroup.add(hm);
+        }
+      });
+      for(let i=0;i<9;i++){                                // the Judean hill country stacked up behind
+        const a=i/9*TAU+Math.random()*0.3, rr=WORLD_R*3.9+Math.random()*14, w=24+Math.random()*15;
+        const rg=new THREE.Mesh(hillGeoE, farE); rg.scale.set(w,5+Math.random()*3.5,w*0.8);
+        rg.position.set(Math.cos(a)*rr,-3.0,Math.sin(a)*rr); rg.rotation.y=Math.random()*TAU;
         rg.castShadow=false; groundGroup.add(rg);
       }
     } else if(env.horizon==='nighthills'){
@@ -3562,6 +3606,148 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     }
   }
 
+  // ---- The Valley of Elah (the 'elah' biome — 1 Samuel 17): the morning of the challenge.
+  //      The brook of smooth stones runs ACROSS the frame, and the two armies hold the ground
+  //      on either side of it — "the Philistines on one hill and Israel on another, with the
+  //      valley between them" (17:3). Up-screen: the Philistine ridge, a rank of bronze spears
+  //      over black goat-hair tents, and Goliath already down on the valley floor with his
+  //      shield-bearer before him (17:7), rim-lit by the low sun. Down-screen, behind the boy,
+  //      Israel's camp waits. Terebinths — the *elah* the valley is named for — shade the near
+  //      bank. The whole scene is composed ACROSS the camera diagonal instead of up it, because
+  //      the story is two sides facing each other with water in between. ----
+  const EL_LUSH  = new THREE.Color(0x74c25c);            // watered green hugging the brook
+  const EL_SLOPE = new THREE.Color(0xbca968);            // summer-cured gold climbing both slopes
+  const EL_R = 0.70710678;
+  // the valley's own axes: u runs ALONG the brook, s runs ACROSS it (s<0 = up-screen = Philistia).
+  // s(x,z) === (x+z)*0.7071, which is exactly the term the ground vertex-tint already uses.
+  function elPt(u,s){ return [ (u+s)*EL_R, (s-u)*EL_R ]; }
+  const EL_BRONZE = 0xb08432, EL_SPEAR = 0x8d6f3f;
+  function elTerebinth(x,z){
+    // the valley's namesake: a short thick bole under a broad, flat, wind-spread crown
+    const g=new THREE.Group(), s=.8+Math.random()*.5;
+    const EG=[0x4e7a3a,0x5b8746,0x446e33];
+    g.add(part('robe',0x6d5334, 0,1.45*s,0, .58*s,2.9*s,.58*s));
+    for(let i=0;i<3;i++){                                 // limbs reaching out, not up
+      const a=Math.random()*TAU;
+      g.add(part('cylinder',0x6d5334, Math.cos(a)*.7*s,2.5*s,Math.sin(a)*.7*s, .17*s,1.5*s,.17*s, Math.sin(a)*.7,0,-Math.cos(a)*.7));
+    }
+    g.add(sph(EG[0], 0,3.5*s,0, 2.5*s,.85*s,2.4*s));      // the flat spreading crown
+    g.add(sph(EG[1], 1.1*s,3.9*s,.4*s, 1.5*s,.62*s,1.4*s));
+    g.add(sph(EG[2],-1.0*s,3.8*s,-.5*s, 1.4*s,.58*s,1.3*s));
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.018); decor.add(g); return g;
+  }
+  function elTent(x,z,ry,dark){
+    // a camp tent — black goat-hair on the Philistine side, undyed wool on Israel's
+    const g=new THREE.Group(), s=.9+Math.random()*.35;
+    const cloth = dark?0x2f2a26:0xc8b894, shade = dark?0x231f1c:0xab9a78;
+    g.add(part('cone',cloth, 0,.95*s,0, 3.4*s,1.9*s,2.6*s));
+    g.add(part('cone',shade, 0,.93*s,-.35*s, 3.0*s,1.8*s,2.0*s));      // the shaded lee slope
+    g.add(part('cylinder',0x6b5334, 0,1.05*s,0, .09,2.1*s,.09));       // ridge pole poking through
+    [[-1.7,-1.3],[1.7,-1.3],[-1.7,1.3],[1.7,1.3]].forEach(([px,pz])=>  // guy-lines pegged out
+      g.add(part('cylinder',0x8a7550, px*s,.35*s,pz*s, .05,.7*s,.05, .3*Math.sign(pz),0,.3*Math.sign(px))));
+    g.traverse(o=>{ if(o.isMesh) o.receiveShadow=true; });
+    g.position.set(x,0,z); g.rotation.y=ry==null?Math.random()*TAU:ry; decor.add(g); return g;
+  }
+  function elBanner(x,z,hex){
+    // a standard over a camp — the one bright vertical accent in a low horizontal composition
+    const g=new THREE.Group();
+    g.add(part('cylinder',0x6b5334, 0,2.2,0, .1,4.4,.1));
+    const cloth=box(.12,1.5,1.9, hex, 0,3.5,.95); g.add(cloth);
+    g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; windify(g,0.03); decor.add(g); return g;
+  }
+  function elSpearRank(s0, n, dark){
+    // an army read as a SILHOUETTE, not as bodies: a close rank of spear-shafts with helmet
+    // domes and shield discs below them. Costs ~4 meshes a man and reads correctly at distance.
+    const helm = dark?0x8a7340:0x9a8a6a, shield = dark?0x7a4a2c:0x8a7a52;
+    for(let i=0;i<n;i++){
+      const u=-WORLD_R*1.05 + i*(WORLD_R*2.1/(n-1)) + (Math.random()-.5)*1.6;
+      const s=s0+(Math.random()-.5)*2.4;
+      const [x,z]=elPt(u,s);
+      const g=new THREE.Group();
+      g.add(part('cylinder',EL_SPEAR, 0,1.9,0, .07,3.8,.07, 0,0,(Math.random()-.5)*.14));   // the spear
+      g.add(part('cone',EL_BRONZE, 0,3.95,0, .17,.5,.17));                                   // its head
+      g.add(sph(helm, 0,1.45,0, .3,.34,.3));                                                 // helmet dome
+      g.add(part('cylinder',shield, .34,1.0,.1, .62,.1,.62, Math.PI/2,0,0));                 // slung shield
+      g.traverse(o=>{ if(o.isMesh) o.castShadow=false; });
+      g.position.set(x,0,z); g.rotation.y=Math.random()*TAU; decor.add(g);
+    }
+  }
+  function elGoliath(){
+    // "six cubits and a span" (17:4). Built at NORMAL human proportions in a ~3-unit template
+    // and then scaled as a whole — building him "big" part-by-part is what turns a giant into a
+    // brown blob, because the width terms grow faster than the eye expects. Bronze helmet,
+    // scale coat and greaves (17:5-6), and the spear shaft "like a weaver's beam" (17:7) held
+    // straight up, which is the part that actually reads at distance: one hard vertical.
+    const g=new THREE.Group();
+    const skin=0xc08a5e, coat=0x9c7b3e, kilt=0x6d4a2a, leg=0x5a4632;
+    g.add(part('cylinder',leg, -.20,.55,0, .26,1.1,.26));                       // legs
+    g.add(part('cylinder',leg,  .20,.55,0, .26,1.1,.26));
+    g.add(part('cylinder',EL_BRONZE,-.20,.34,.01, .29,.62,.29));                // bronze greaves
+    g.add(part('cylinder',EL_BRONZE, .20,.34,.01, .29,.62,.29));
+    g.add(part('robe',kilt, 0,1.22,0, .62,.62,.56));                            // war kilt
+    g.add(part('capsule',coat, 0,1.85,0, .60,.42,.46));                         // scale-armor coat
+    for(let r=0;r<3;r++)                                                        // scale courses catching the sun
+      g.add(part('cylinder',EL_BRONZE, 0,1.58+r*.26,.01, .61-r*.02,.05,.47-r*.02));
+    g.add(part('cylinder',EL_BRONZE, 0,2.22,0, .70,.10,.55));                   // shoulder yoke (see the TARGET-LOOK note)
+    g.add(part('capsule',skin, -.42,1.78,0, .19,.38,.19, 0,0,.10));             // arms, hanging close
+    g.add(part('capsule',skin,  .42,1.78,0, .19,.38,.19, 0,0,-.10));
+    g.add(part('cylinder',skin, 0,2.32,0, .20,.20,.20));                        // neck
+    g.add(sph(skin, 0,2.62,0, .26,.29,.25));                                    // head
+    g.add(sph(0x3a2f24, 0,2.54,-.08, .26,.24,.22));                             // beard
+    g.add(sph(EL_BRONZE, 0,2.80,0, .29,.26,.28));                               // bronze helmet
+    g.add(part('cone',0xc23a2f, 0,3.14,0, .13,.46,.13));                        // its red plume
+    g.add(part('cylinder',EL_SPEAR, .60,2.30,.10, .07,4.8,.07));                // the weaver's beam, upright
+    g.add(part('cone',EL_BRONZE, .60,4.90,.10, .15,.62,.15));
+    g.add(part('cylinder',0x8a5a30, -.66,1.60,.18, 1.05,.10,1.05, Math.PI/2,0,.12));  // slung shield
+    g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+    g.scale.setScalar(2.35);                        // ~7 units to a 3-unit boy: he reads as a giant
+    // +u is screen-RIGHT under this camera, so a negative u swings him off to screen-left —
+    // out from under the mission chip that sits dead top-centre and was cropping his helmet
+    const [gx,gz]=elPt(-9.0, -WORLD_R*0.40);
+    g.position.set(gx,0,gz);
+    g.rotation.y=Math.atan2(-gx,-gz)+Math.PI;       // squared around, facing back down the valley
+    props.add(g);
+    // his shield-bearer walking before him (17:7) — the giant needs something ordinary next to
+    // him or there is nothing in frame to be big COMPARED TO
+    const sb=makeNPC('traveler');
+    const [sx,sz]=elPt(-10.4, -WORLD_R*0.40+4.2);
+    sb.position.set(sx,0,sz); sb.rotation.y=g.rotation.y; props.add(sb);
+    return g;
+  }
+  function elPebble(x,z){
+    // water-rounded brook stones — the ones David is about to choose from (17:40)
+    const p=new THREE.Mesh(ugeo('sphere'), flatMat([0xc8ccd2,0xb4b8c0,0xd6d9de,0xa6aab2][Math.floor(Math.random()*4)]));
+    const r=.22+Math.random()*.3;
+    p.scale.set(r*2, r*1.05, r*1.7); p.rotation.y=Math.random()*TAU;
+    p.position.set(x,.05,z); p.castShadow=false; p.receiveShadow=true; decor.add(p);
+  }
+  function elahScenery(){
+    // — the two armies, held well outside the play area so they stay pure silhouette —
+    elSpearRank(-WORLD_R*1.22, 14, true);                 // Philistia, up-screen
+    elSpearRank( WORLD_R*1.22, 11, false);                // Israel, down-screen behind the player
+    for(let i=0;i<6;i++){ const [x,z]=elPt(-WORLD_R*.95+i*(WORLD_R*1.9/5), -WORLD_R*1.95); elTent(x,z,null,true); }
+    for(let i=0;i<5;i++){ const [x,z]=elPt(-WORLD_R*.85+i*(WORLD_R*1.7/4),  WORLD_R*1.95); elTent(x,z,null,false); }
+    { const [x,z]=elPt(-6, -WORLD_R*1.86); elBanner(x,z,0x8f2f2f); }          // Philistine standard
+    { const [x,z]=elPt( 5,  WORLD_R*1.86); elBanner(x,z,0x2f4f8f); }          // Israel's
+    elGoliath();
+    // — the valley floor itself: terebinths on the banks, scrub up the dry slopes —
+    for(let i=0;i<7;i++){
+      const u=(Math.random()*2-1)*WORLD_R*0.9, s=(Math.random()<.5?-1:1)*(5+Math.random()*(WORLD_R*0.55));
+      const [x,z]=elPt(u,s); if(!inWater(x,z)) elTerebinth(x,z);
+    }
+    for(let i=0,n=Math.round(WORLD_R*0.7);i<n;i++){ const [x,z]=randPos(2); if(!inWater(x,z)) makeScrub(x,z); }
+    for(let i=0,n=Math.round(WORLD_R*0.5);i<n;i++){   // boulders, thicker up the cured slopes
+      const u=(Math.random()*2-1)*WORLD_R*0.95, s=(Math.random()<.5?-1:1)*(6+Math.random()*(WORLD_R*0.6));
+      const [x,z]=elPt(u,s); if(!inWater(x,z)) makeRock(x,z,0.6+Math.random()*0.9);
+    }
+    // — the brook bed: smooth stones crowding both waterlines —
+    for(let i=0;i<64;i++){
+      const u=(Math.random()*2-1)*WORLD_R*1.05;
+      const s=(Math.random()<.5?-1:1)*(2.15+Math.random()*2.0);
+      const [x,z]=elPt(u,s); elPebble(x,z);
+    }
+  }
+
   function scatterScenery(){
     swayers = [];                          // decor is cleared each mission; rebuild the sway list
     wheatOn = false;                       // wheatScenery() re-arms it when this biome is the wheat field
@@ -3616,6 +3802,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       edenScenery();
     } else if(d==='arkyard'){
       arkyardScenery();
+    } else if(d==='elah'){
+      elahScenery();
     } else {
       for(let i=0;i<nT;i++){ const [x,z]=randPos(3); if(Math.hypot(x,z)>6) makeTree(x,z); }
       for(let i=0;i<nR;i++){ const [x,z]=randPos(2); makeRock(x,z,0.7+Math.random()); }
@@ -4523,6 +4711,157 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   }
   function stopMusic(){ if(musicTimer){ clearTimeout(musicTimer); musicTimer=null; } }
 
+  // ================= PER-BIOME AMBIENCE =================
+  // A soundbed per biome, entirely procedural — no audio files, so the game stays a single
+  // offline HTML and downloads nothing. One looping white-noise buffer feeds every continuous
+  // layer (wind, brook, surf, fire, crowd) through its own filter + slow LFO; birds, crickets,
+  // drips and hammer taps are scheduled one-shots. Everything hangs off one ambGain that sits
+  // UNDER the music and the animal cries, so it reads as a room you're standing in and never
+  // competes with the thing the kid just did. It follows the existing 🎵 toggle, which stays
+  // the single control that silences the game — no new switch on the UI.
+  let ambGain=null, ambNodes=[], ambTimers=[], ambNoise=null, ambOn=false;
+  function ambBuffer(){
+    if(ambNoise) return ambNoise;
+    const n=Math.floor(audioCtx.sampleRate*3);
+    const b=audioCtx.createBuffer(1,n,audioCtx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+    return ambNoise=b;
+  }
+  // a continuous filtered-noise layer; rate/depth give it a slow swell so it never sits still
+  function ambBed(type, freq, q, vol, rate, depth){
+    const src=audioCtx.createBufferSource(); src.buffer=ambBuffer(); src.loop=true;
+    const f=audioCtx.createBiquadFilter(); f.type=type; f.frequency.value=freq; if(q) f.Q.value=q;
+    const g=audioCtx.createGain(); g.gain.value=0.0001;
+    g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime+1.6);      // fade in, never a hard cut
+    src.connect(f); f.connect(g); g.connect(ambGain); src.start();
+    ambNodes.push(src,f,g);
+    if(rate){                                                          // breathe the level up and down
+      const o=audioCtx.createOscillator(), og=audioCtx.createGain();
+      o.frequency.value=rate; og.gain.value=depth||vol*0.5;
+      o.connect(og); og.connect(g.gain); o.start(); ambNodes.push(o,og);
+    }
+    return g;
+  }
+  // schedule a recurring one-shot at a random interval in [minS,maxS]
+  function ambEvery(minS, maxS, fn){
+    const tick=()=>{ if(!ambOn) return; fn(); ambTimers.push(setTimeout(tick,(minS+Math.random()*(maxS-minS))*1000)); };
+    ambTimers.push(setTimeout(tick, (0.4+Math.random()*maxS)*1000));
+  }
+  function ambPing(f0,f1,dur,vol,type){                                 // one short pitched blip
+    if(!audioCtx||!ambOn) return; const t=audioCtx.currentTime;
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=type||'sine';
+    o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(40,f1),t+dur);
+    g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(vol,t+.012);
+    g.gain.exponentialRampToValueAtTime(.0004,t+dur);
+    o.connect(g); g.connect(ambGain); o.start(t); o.stop(t+dur+.03);
+  }
+  function ambBird(){                                                   // a 2–4 note song, never the same twice
+    const n=2+Math.floor(Math.random()*3), f=1700+Math.random()*1500;
+    for(let i=0;i<n;i++) setTimeout(()=>ambPing(f*(1+(Math.random()-.5)*.3), f*1.4, .11, .30), i*95);
+  }
+  function ambCricket(){                                                // a short chirr — pulses, not a tone
+    for(let i=0;i<4;i++) setTimeout(()=>ambPing(4300+Math.random()*500, 4200, .035, .12), i*42);
+  }
+  function ambNoiseBurst(vol,freq,dur){                                 // fire pop / hammer knock / wave slap
+    if(!audioCtx||!ambOn) return; const t=audioCtx.currentTime;
+    const src=audioCtx.createBufferSource(); src.buffer=ambBuffer();
+    src.loop=false; src.playbackRate.value=0.7+Math.random()*0.6;
+    const f=audioCtx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq; f.Q.value=1.4;
+    const g=audioCtx.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0004,t+dur);
+    src.connect(f); f.connect(g); g.connect(ambGain);
+    src.start(t, Math.random()*2); src.stop(t+dur+.02);
+  }
+  function stopAmbience(){
+    ambOn=false;
+    ambTimers.forEach(clearTimeout); ambTimers=[];
+    if(ambGain && audioCtx){                                            // fade out so leaving a level isn't a click
+      const t=audioCtx.currentTime;
+      ambGain.gain.cancelScheduledValues(t);
+      ambGain.gain.setValueAtTime(ambGain.gain.value, t);
+      ambGain.gain.exponentialRampToValueAtTime(.0001, t+0.35);
+    }
+    const dead=ambNodes; ambNodes=[];
+    setTimeout(()=>dead.forEach(n=>{ try{ n.stop&&n.stop(); n.disconnect(); }catch(e){} }), 420);
+  }
+  function startAmbience(){
+    stopAmbience();
+    if(!musicOn) return;                                                // the 🎵 chip silences the whole game
+    initAudio(); if(!audioCtx) return;
+    setTimeout(()=>{                                                    // after the old bed's fade-out
+      if(!audioCtx) return;
+      ambGain=audioCtx.createGain(); ambGain.gain.value=0.55; ambGain.connect(audioCtx.destination);
+      ambOn=true;
+      const env=currentEnv||{}, d=env.decor||'forest', night=!!env.night, storm=!!env.storm;
+      if(storm){                                                        // the squall drowns everything else out
+        ambBed('lowpass', 620, 0, .16, .07, .06);                       // wind driving over open water
+        ambBed('highpass',1900, 0, .07, .13, .03);                      // rain hiss on the deck
+        ambBed('lowpass', 150, 0, .10, .05, .04);                       // the swell working under the hull
+        return;
+      }
+      if(env.interior){
+        if(d==='den'){                                                  // the lions' den: hollow, dripping, alive
+          ambBed('lowpass', 110, 0, .13, .04, .05);                     // cave rumble
+          ambEvery(2.4, 7, ()=>ambPing(1500+Math.random()*900, 260, .5, .16));   // water off the roof
+          ambEvery(9, 20, ()=>ambPing(70, 52, 1.5, .09, 'sawtooth'));   // a lion breathing somewhere in the dark
+        } else if(d==='fish'){                                          // inside the great fish — muffled and wet
+          ambBed('lowpass', 90, 0, .17, .03, .07);                      // the sea outside, felt not heard
+          ambEvery(1.6, 4.5, ()=>ambNoiseBurst(.10, 300+Math.random()*260, .5));  // gurgles
+          ambEvery(6, 11, ()=>ambPing(58, 44, 2.0, .11, 'sine'));       // the slow heartbeat of something huge
+        } else if(d==='furnace'){                                       // the plain of Dura, blast doors open
+          ambBed('lowpass', 380, 0, .15, .09, .05);                     // the roar in the kiln
+          ambEvery(.16, .55, ()=>ambNoiseBurst(.09, 1600+Math.random()*1800, .09));  // crackle
+        } else {                                                        // the temple: stone, space, and quiet
+          ambBed('lowpass', 220, 0, .07, .03, .03);
+          ambEvery(11, 26, ()=>{ ambPing(392, 388, 2.6, .07, 'sine'); ambPing(588, 585, 2.2, .04, 'sine'); });
+        }
+        return;
+      }
+      if(d==='heaven'){                                                 // New Jerusalem: no wind, only light
+        ambBed('lowpass', 700, 0, .05, .02, .02);
+        ambEvery(3.5, 8, ()=>{ const b=[784,988,1175,1568][Math.floor(Math.random()*4)];
+          ambPing(b, b, 2.4, .09, 'sine'); ambPing(b*1.5, b*1.5, 1.8, .045, 'sine'); });
+        return;
+      }
+      // ---- open-air biomes: a wind bed tuned to the ground, then whatever lives there ----
+      const DRY = (d==='desert'||d==='canyon'||d==='egypt'||d==='jericho'||d==='redsea'||d==='mountain');
+      if(d==='mountain')      ambBed('bandpass', 900, .7, .13, .06, .06);   // thin, high, exposed
+      else if(DRY)            ambBed('lowpass',  520, 0,  .11, .05, .05);   // dry gusting over stone
+      else if(night)          ambBed('lowpass',  300, 0,  .07, .035,.03);   // the night barely moves
+      else                    ambBed('lowpass',  460, 0,  .09, .045,.04);   // soft grass-country wind
+      if(env.water==='stream'){                                         // a brook, close and bright
+        ambBed('bandpass', 1500, .55, .13, .11, .05);
+        ambBed('bandpass', 3100, .8,  .06, .17, .03);
+      } else if(env.water==='sea'){                                     // surf, with a real swell under it
+        ambBed('lowpass', 900, 0, .12, .055, .07);
+        ambEvery(4.5, 9, ()=>ambNoiseBurst(.13, 700+Math.random()*500, 1.1));
+      } else if(env.water==='lake'||env.water==='pond'){
+        ambBed('bandpass', 1200, .6, .05, .09, .025);
+      }
+      if(night){
+        ambEvery(.7, 2.4, ambCricket);
+        ambEvery(14, 34, ()=>ambPing(430, 300, .5, .12, 'sine'));       // a far-off night bird
+      } else if(!DRY){
+        ambEvery(2.2, 6.5, ambBird);
+      } else {
+        ambEvery(13, 30, ()=>ambPing(1150, 780, .7, .10, 'sine'));      // one hawk, a long way up
+      }
+      if(d==='city'){                                                   // a street with people in it
+        ambBed('lowpass', 420, 0, .09, .12, .05);
+        ambEvery(3, 8, ()=>ambPing(180+Math.random()*160, 150, .45, .07, 'triangle'));
+      }
+      if(d==='arkyard'){                                                // a working yard under a coming storm
+        ambEvery(.9, 3.2, ()=>ambNoiseBurst(.11, 900+Math.random()*700, .16));   // mallet on peg
+        ambEvery(11, 24, ()=>ambPing(62, 46, 2.2, .10, 'sine'));                 // thunder still miles off
+      }
+      if(d==='elah'){                                                   // two armies waiting across a brook
+        ambEvery(7, 16, ()=>ambNoiseBurst(.07, 2400+Math.random()*900, .22));    // bronze shifting on the ridge
+      }
+      if(d==='pasture'||d==='village'){
+        ambEvery(6, 15, ()=>{ slide(340,300,0,.24,'sawtooth',.14,14); });        // a sheep, a field away
+      }
+    }, ambGain?440:0);
+  }
+
   let voiceOn=true; try{voiceOn=localStorage.getItem('ba_voice')!=='0';}catch(e){}
   let warmVoice=null;
   function pickVoice(){ if(!('speechSynthesis' in window))return; const vs=speechSynthesis.getVoices();
@@ -4618,6 +4957,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const TERRA  =[0xcabb8e,0xbfae7f,0xd6c79c,0xa4a370];   // swept hill-town courtyard earth with sage tufts in the shade (hilltown biome)
   const EDENG  =[0x46b452,0x3ca24a,0x58c25e,0x2f9440];   // rain-fresh paradise green, deeper and richer than any field since (eden biome)
   const AK_G   =[0x55b154,0x49a04b,0x62bd5f,0x3e9245];   // storm-lit working green — turf gone vivid under the coming rain (arkyard biome)
+  const ELAH_G =[0x9fb163,0x93a659,0xaabb6f,0x84994f];   // high-summer valley grass, half-cured to gold away from the brook (elah biome)
   const MISSIONS = [
     { id:'creation', name:'Let There Be Light', emoji:'🌅', type:'collect', base:8, item:'starbit',
       goal:'In the beginning God made everything! Gather the sparkles of the very first light!',
@@ -4656,9 +4996,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       verse:'“Then Samuel said, ‘Speak, for your servant is listening.’” — 1 Samuel 3:10',
       env:{ ground:NW_G, water:null, sky:0x121a38, fogNear:40, fogFar:82, decor:'nightwild', horizon:'nighthills', night:true } },
     { id:'stones', name:"David's 5 Stones", emoji:'🪨', type:'collect', base:5, fixed:5, item:'stone',
-      goal:'Gather 5 smooth stones by the stream.',
+      goal:'Gather 5 smooth stones from the brook.',
       verse:'“He chose five smooth stones from the stream.” — 1 Samuel 17:40',
-      env:{ ground:GREEN, water:'stream', sky:0x8fd0ff, decor:'forest' } },
+      env:{ ground:ELAH_G, water:'stream', waterColor:0x4aa8c6, sky:0xdfe7ee, fogNear:50, fogFar:100,
+            decor:'elah', horizon:'elah' } },
     { id:'basket', name:'Baby Moses in the Basket', emoji:'🧺', type:'reach',
       goal:'Baby Moses is floating in a basket among the reeds! Walk along the river and find him!',
       verse:'“She opened it and saw the baby. He was crying, and she felt sorry for him.” — Exodus 2:6',
@@ -4790,7 +5131,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     { id:'pentecost', name:'The Day of Pentecost', emoji:'🔥', type:'collect', base:9, item:'flame',
       goal:'God sent His Holy Spirit like little flames of fire on Jesus’ friends! Gather the bright flames!',
       verse:'“They saw what seemed to be tongues of fire that… came to rest on each of them. All of them were filled with the Holy Spirit.” — Acts 2:3-4',
-      env:{ ground:GREEN, water:null, sky:0xf7cfa4, decor:'forest' } },
+      // Acts 2 happens in JERUSALEM at nine in the morning (2:15), with a crowd "from every
+      // nation under heaven" already gathering in the street — not in a green field.
+      env:{ ground:COBBLE, water:null, sky:0xf3e0bc, fogNear:52, fogFar:100, decor:'city', horizon:'city' } },
     { id:'ethiopian', name:'Philip & the Chariot', emoji:'📜', type:'reach',
       goal:'A traveler from far-away Ethiopia is reading God’s Word in his chariot — and needs a helper! Run to the chariot like Philip and share the good news about Jesus!',
       verse:'“Then Philip began with that very passage of Scripture and told him the good news about Jesus.” — Acts 8:35',
@@ -4879,7 +5222,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       say('Find the lamb with the golden glow! 🐑✨',4200);
     } else if(mission.type==='collect'){
       const n = mission.fixed || Math.max(3, Math.round(mission.base*mult)); missionCtx.target=n;
-      for(let a=0;a<n;a++){ const [x,z]=randPos(3); const it=makeSparkleItem(mission.item); it.position.set(x,0,z);
+      for(let a=0;a<n;a++){
+        let x,z;
+        if(mission.id==='stones'){
+          // "he chose five smooth stones FROM the stream" (17:40) — randPos actively avoids
+          // water, so left to itself it scatters them up the dry hillsides and the verse stops
+          // matching what the kid does. Lay them along the brook's two waterlines instead,
+          // spread down its length so gathering them walks you across the whole valley floor.
+          const u=(a/(n-1)*1.7-0.85)*WORLD_R + (Math.random()-.5)*3;
+          const s=(a%2?1:-1)*(2.3+Math.random()*1.1);
+          [x,z]=elPt(u,s);
+        } else { [x,z]=randPos(3); }
+        const it=makeSparkleItem(mission.item); it.position.set(x,0,z);
         it.userData.spin=Math.random()*TAU; items.add(it); }
       if(mission.id==='fishers'){ // Jesus calls from the shore
         const js=makeNPC('jesus'); js.position.set(3,0,-3); js.rotation.y=2.6; props.add(js);
@@ -5295,6 +5649,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     updateGoal();
     speak(mission.goal);
     playing=true;
+    startAmbience();                       // the biome's soundbed comes up as the world does
     camSnap();
   }
 
@@ -5849,6 +6204,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     itemPos: ()=>items.children.map(c=>[+c.position.x.toFixed(1),+c.position.z.toFixed(1)]),
     goalPos: ()=>missionCtx&&missionCtx.goalObj?missionCtx.goalObj.position.toArray().map(n=>+n.toFixed(1)):null,
     specialPos: ()=>missionCtx&&missionCtx.special?missionCtx.special.position.toArray().map(n=>+n.toFixed(1)):null,
+    // "no JS error" is NOT proof the soundbed built — a silent ambience throws nothing at all.
+    // This reports what actually got wired so a headless check can assert on it.
+    amb: ()=>({ on:ambOn, nodes:ambNodes.length, timers:ambTimers.length, ctx:audioCtx?audioCtx.state:null }),
     state: ()=>({ pos: player?player.position.toArray().map(n=>+n.toFixed(2)):null,
       collected: missionCtx?missionCtx.collected:0, target: missionCtx?missionCtx.target:0,
       playing, won, animalsLeft: critters.children.filter(c=>c.userData.kind==='animal'&&!c.userData.caught).length })
@@ -5946,7 +6304,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
   // ================= SCREENS / NAV =================
   function hideScreens(){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('show')); }
-  function showScreen(id){ hideScreens(); document.getElementById(id).classList.add('show'); document.body.className=''; playing=false; }
+  function showScreen(id){ hideScreens(); document.getElementById(id).classList.add('show'); document.body.className=''; playing=false; stopAmbience(); }
 
   const nameInput=document.getElementById('nameInput');
   function nameKey(a){ return 'ba_name_'+a; }
@@ -6045,7 +6403,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const mChip=document.getElementById('musicChip');
   function syncMusic(){ mChip.textContent = musicOn?'🎵 Music: On':'🔇 Music: Off'; }
   syncMusic();
-  mChip.onclick=()=>{ musicOn=!musicOn; try{localStorage.setItem('ba_music',musicOn?'1':'0');}catch(e){} syncMusic(); if(musicOn) playMusic(); else stopMusic(); };
+  mChip.onclick=()=>{ musicOn=!musicOn; try{localStorage.setItem('ba_music',musicOn?'1':'0');}catch(e){} syncMusic();
+    if(musicOn){ playMusic(); if(playing) startAmbience(); } else { stopMusic(); stopAmbience(); } };
 
   addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
   // unlock audio on first tap
