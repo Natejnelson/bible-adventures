@@ -93,21 +93,55 @@
   #nameInput:focus { border-color: #ffd21a; }
   #nameInput::placeholder { color:#8fb0c4; font-weight:700; }
 
-  /* Mission cards */
-  #missionList { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+  /* Mission trail — the level list reads as a journey down a dotted path, not a menu.
+     A white dotted line runs down the icon column and shows in the gaps between cards,
+     stitching the adventures into one road from Creation to the Shining City. */
+  #missionList { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 22px; margin-top: 10px;
+    position: relative; padding-bottom: 26px; }
+  #missionList::before { content: ''; position: absolute; left: 42px; top: 34px; bottom: 44px; width: 8px;
+    background-image: radial-gradient(circle, rgba(255,255,255,.9) 3px, rgba(255,255,255,0) 3.6px);
+    background-size: 8px 11px; }
   .mCard { display: flex; align-items: center; gap: 14px; border: none; cursor: pointer; text-align: left;
     font-family: inherit; background: #fff; border-radius: 20px; padding: 12px 16px;
-    box-shadow: 0 6px 14px rgba(0,0,0,.2); transition: transform .08s; }
+    box-shadow: 0 6px 14px rgba(0,0,0,.2); transition: transform .12s; position: relative; }
   .mCard:active { transform: scale(.98); }
+  .mCard:not(.locked):hover { transform: translateY(-2px); }
   .mCard.locked { opacity: .55; cursor: not-allowed; }
-  .mIcon { width: 60px; height: 60px; flex: 0 0 60px; border-radius: 16px; display: flex; align-items: center;
-    justify-content: center; font-size: 34px; background: linear-gradient(160deg, #7ec8ff, #4f9fda); }
+  .mIcon { width: 60px; height: 60px; flex: 0 0 60px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 30px; background: linear-gradient(160deg, #7ec8ff, #4f9fda);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.14); position: relative; }
   .mCard.done .mIcon { background: linear-gradient(160deg, #4bd15e, #2ba341); }
   .mCard.locked .mIcon { background: #9aa6b8; }
-  .mBody { flex: 1; }
+  .mNum { position: absolute; right: -3px; bottom: -3px; min-width: 22px; height: 22px; padding: 0 4px;
+    border-radius: 11px; background: #fff; color: #3f8cc7; font-size: 12px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,.25); }
+  .mCard.done .mNum { color: #2ba341; }
+  .mCard.locked .mNum { color: #9aa6b8; }
+  .mBody { flex: 1; min-width: 0; }
   .mName { font-size: 18px; font-weight: 800; color: #223; }
   .mGoalTxt { font-size: 13px; color: #667; margin-top: 1px; }
   .mStars { font-size: 15px; margin-top: 2px; }
+  /* the next adventure on the road glows gold and gently beckons */
+  .mCard.next { box-shadow: 0 0 0 4px #ffd21a, 0 10px 22px rgba(0,0,0,.28); }
+  .mCard.next .mIcon { background: linear-gradient(160deg, #ffd95e, #f0a71b); animation: nextPulse 1.5s ease-in-out infinite; }
+  .mCard.next .mNum { color: #c98a00; }
+  .mNext { color: #c98a00; font-weight: 900; }
+  @keyframes nextPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.09); } }
+  /* one-shot entrance stagger (same deliberate CSS exception as the win card);
+     renderMap adds .settled shortly after as a belt-and-braces guarantee of the final state */
+  #missionList .mCard { animation: cardIn .45s cubic-bezier(.22,1.1,.36,1) both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(16px) scale(.97); } }
+  #missionList.settled .mCard { animation: none; opacity: 1; }
+  /* journey progress under the map title */
+  #mapProg { width: min(320px, 80vw); height: 20px; flex: 0 0 20px; border-radius: 10px; background: rgba(255,255,255,.45);
+    margin: 8px auto 2px; position: relative; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,.12); }
+  #mapProgFill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ffd21a, #ffb43d);
+    width: 0; transition: width .6s cubic-bezier(.22,1.1,.36,1); }
+  #mapProgTxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900; color: #17506b; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
+  @media (prefers-reduced-motion: reduce) {
+    #missionList .mCard, .mCard.next .mIcon { animation: none; }
+  }
   #topBar { width: 100%; max-width: 560px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .topBtn { border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 15px; color: #fff;
     background: rgba(0,0,0,.25); padding: 9px 14px; border-radius: 14px; }
@@ -194,6 +228,7 @@
     <span class="topBtn" id="gemCount" style="background:rgba(0,0,0,.25)">⭐ 0</span>
   </div>
   <div class="bigTitle" style="font-size:30px">🗺️ Pick an Adventure</div>
+  <div id="mapProg"><div id="mapProgFill"></div><span id="mapProgTxt"></span></div>
   <div id="missionList"></div>
 </div>
 
@@ -6198,6 +6233,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   if(/debug/.test(location.search)) window.__ba = {
     setCam:(o)=>{ dbgCam=o||null; },
     cheer:()=>celebrate(playerRig,3,true),
+    map: ()=>openMap(),
     frame, render: ()=>renderer.render(scene,camera), input: inputVec,
     tp: (x,z)=>{ if(player){ player.position.x=x; player.position.z=z; } },
     animalPos: ()=>critters.children.filter(c=>c.userData.kind==='animal'&&!c.userData.caught).map(c=>[+c.position.x.toFixed(1),+c.position.z.toFixed(1)]),
@@ -6319,13 +6355,28 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
   function renderMap(){
     document.getElementById('gemCount').textContent='⭐ '+totalStars();
-    const list=document.getElementById('missionList'); list.innerHTML='';
+    const doneN = MISSIONS.reduce((n,m)=>n+(starsFor(m.id)>0?1:0),0);
+    document.getElementById('mapProgFill').style.width = Math.round(doneN/MISSIONS.length*100)+'%';
+    document.getElementById('mapProgTxt').textContent = doneN+' of '+MISSIONS.length+' adventures';
+    const list=document.getElementById('missionList'); list.innerHTML=''; list.classList.remove('settled');
+    let nextEl=null, nextIdx=-1;
     MISSIONS.forEach((m,i)=>{ const unlocked=isUnlocked(i), got=starsFor(m.id);
-      const c=document.createElement('button'); c.className='mCard '+(got>0?'done ':'')+(unlocked?'':'locked');
-      c.innerHTML='<div class="mIcon">'+(unlocked?m.emoji:'🔒')+'</div><div class="mBody"><div class="mName">'+m.name+'</div>'
-        +'<div class="mGoalTxt">'+m.goal+'</div><div class="mStars">'+(got>0?'⭐⭐⭐':(unlocked?'Tap to play!':'Finish the last one first'))+'</div></div>';
+      const isNext = unlocked && got===0 && !nextEl;
+      const c=document.createElement('button');
+      c.className='mCard '+(got>0?'done ':'')+(unlocked?'':'locked')+(isNext?'next':'');
+      c.style.animationDelay=(Math.min(i,12)*35)+'ms';   // stagger the first screenful, then land together
+      c.innerHTML='<div class="mIcon">'+(unlocked?m.emoji:'🔒')+'<span class="mNum">'+(i+1)+'</span></div>'
+        +'<div class="mBody"><div class="mName">'+m.name+'</div>'
+        +'<div class="mGoalTxt">'+m.goal+'</div>'
+        +'<div class="mStars">'+(got>0?'⭐⭐⭐':(isNext?'<span class="mNext">▶ Up next!</span>':(unlocked?'Tap to play!':'Finish the one before to unlock')))+'</div></div>';
       if(unlocked) c.onclick=()=>{ won=false; startMission(i); };
+      if(isNext){ nextEl=c; nextIdx=i; }
       list.appendChild(c); });
+    // guarantee the final state even if the entrance animation is skipped or frozen
+    clearTimeout(renderMap._t);
+    renderMap._t=setTimeout(()=>list.classList.add('settled'), 950);
+    // a returning kid lands on their next adventure, not on 30 finished cards to scroll past
+    if(nextEl && nextIdx>3) setTimeout(()=>{ try{ nextEl.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){} }, 80);
   }
   function openMap(){ showScreen('mapScreen'); renderMap(); }
 
