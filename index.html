@@ -6029,6 +6029,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         camTarget.set(player.position.x+CAM_D, nCam?CAM_H_NIGHT:CAM_H, player.position.z+CAM_D);
         camera.position.lerp(camTarget, 0.12);
         camera.lookAt(player.position.x, nCam?2.5:1.5, player.position.z);
+        if(camPunch>0.004) camera.translateZ(-camPunch*0.6);   // pickup punch: slide along the view axis only (angle untouched)
       }
 
       checkMission();
@@ -6066,6 +6067,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // ---- ambient "living world" motion (cheap; runs every frame) ----
     const T = clock.elapsedTime;
     animateRigs(dt, T);   // every person & animal: breath, blinks, glances, walks, grazing, tails
+    updateFx(dt);         // pickup pops + sparkle bursts keep settling even as the win card shows
     // gentle wind sway on trees/plants (pivots from their base at y=0 — play area stays flat)
     for(let i=0;i<swayers.length;i++){ const s=swayers[i], a=s.userData;
       const w = Math.sin(T*1.1 + a.phase)*a.sway; s.rotation.z = w + (a.lean||0); s.rotation.x = w*0.4; }
@@ -6316,6 +6318,10 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // "no JS error" is NOT proof the soundbed built — a silent ambience throws nothing at all.
     // This reports what actually got wired so a headless check can assert on it.
     amb: ()=>({ on:ambOn, nodes:ambNodes.length, timers:ambTimers.length, ctx:audioCtx?audioCtx.state:null }),
+    fx: ()=>{ const bu=fxList.find(f=>f.kind==='burst');
+      return { n:fxList.length, punch:+camPunch.toFixed(3), kinds:fxList.map(f=>f.kind+':'+f.t.toFixed(2)),
+        p0: bu?bu.parts[0].m.getWorldPosition(new THREE.Vector3()).toArray().map(n=>+n.toFixed(2)):null,
+        op: bu?+bu.parts[0].m.material.opacity.toFixed(2):null }; },
     state: ()=>({ pos: player?player.position.toArray().map(n=>+n.toFixed(2)):null,
       collected: missionCtx?missionCtx.collected:0, target: missionCtx?missionCtx.target:0,
       playing, won, animalsLeft: critters.children.filter(c=>c.userData.kind==='animal'&&!c.userData.caught).length })
@@ -6340,6 +6346,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(a.userData._rig) celebrate(a.userData._rig, 2.2); // the animal wags along too
     sfxPick(); if(a.userData.type) sfxAnimal(a.userData.type);   // 🐑 the animal cries out!
     spark(a.position.x, a.position.z);
+    punchCam(.6);
     updateGoal();
     const now=performance.now();
     missionCtx.combo = (now - missionCtx.comboT < 2600) ? missionCtx.combo+1 : 1;
@@ -6353,10 +6360,60 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       else if(missionCtx.collected%2===0){ say((missionCtx.target-missionCtx.collected)+' more to go! 🐾'); }
     }
   }
-  function spark(x,z){ const g=new THREE.Group();
-    for(let i=0;i<6;i++){ const b=box(.2,.2,.2,0xffe14d, (Math.random()-.5),1+Math.random(),(Math.random()-.5)); g.add(b); }
-    g.position.set(x,0,z); world.add(g); let t=0;
-    (function up(){ t+=0.05; g.children.forEach(c=>{c.position.y+=0.06; c.scale.multiplyScalar(0.92);}); if(t<0.6)requestAnimationFrame(up); else world.remove(g); })();
+  // ---- pickup game-feel: item pop + sparkle burst with real physics + a tiny camera punch ----
+  // driven from the main loop with true dt (updateFx below) — never CSS keyframes
+  const fxList = [];
+  let camPunch = 0;                       // brief punch-in along the view axis; decays fast
+  function punchCam(a){ camPunch = Math.min(1.4, camPunch + a); }
+  const fxRingGeo = new THREE.RingGeometry(.36,.5,24);
+  const SPARK_TINT = { coin:0xffd75e, gold:0xffd75e, starbit:0xffe98a, flame:0xff9d3a, pearl:0xf8ecff,
+    fish:0x9fd4f2, note:0xc9b6ff, grain:0xf0d478, stone:0xd6dae0, clay:0xe0a878, cloth:0xd48fdf };
+  function popItem(it){                    // the pickup itself pops: overshoot, rise, spin, gone
+    items.remove(it); world.add(it);       // items group sits at the world origin, so it keeps its spot
+    fxList.push({kind:'pop', g:it, t:0, life:.42, y0:it.position.y});
+  }
+  function spark(x,z,tint){
+    const g=new THREE.Group(); g.position.set(x,0,z); world.add(g);
+    const parts=[], mats=[];
+    for(let i=0;i<12;i++){
+      const m=new THREE.Mesh(ugeo('sphere'), new THREE.MeshBasicMaterial({color:(i<7?(tint||0xffe14d):i<10?0xffe14d:0xffffff), transparent:true}));
+      m.castShadow=false;
+      const a=Math.random()*TAU, sp=2.0+Math.random()*2.2, s=.26+Math.random()*.20;
+      m.position.set(Math.cos(a)*.5, .6+Math.random()*.5, Math.sin(a)*.5);   // start just outside the player's body so they read
+      m.scale.setScalar(s);
+      parts.push({m, s, vx:Math.cos(a)*sp, vy:3.2+Math.random()*2.6, vz:Math.sin(a)*sp});
+      mats.push(m.material); g.add(m);
+    }
+    const ring=new THREE.Mesh(fxRingGeo, new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.9, side:THREE.DoubleSide, depthWrite:false}));
+    ring.rotation.x=-Math.PI/2; ring.position.y=.09; ring.scale.setScalar(.5); mats.push(ring.material); g.add(ring);
+    fxList.push({kind:'burst', g, parts, ring, mats, t:0, life:.8});
+  }
+  function updateFx(dt){
+    dt = Math.min(dt, 0.05);            // guard: debug harness / tab-restore can hand frame() a huge dt
+    camPunch *= Math.max(0, 1 - dt*7);
+    for(let i=fxList.length-1;i>=0;i--){
+      const f=fxList[i]; f.t+=dt; const k=Math.min(1, f.t/f.life);
+      if(f.kind==='pop'){
+        const e=(k-.3)/.7;                                        // overshoot in, then ease away
+        const s = k<.3 ? 1+.35*(k/.3) : 1.35*(1-e*e);
+        f.g.scale.setScalar(Math.max(.001,s));
+        f.g.position.y = f.y0 + k*k*2.2;
+        f.g.rotation.y += dt*11;
+      } else {
+        for(const p of f.parts){
+          p.vy -= 9.5*dt;
+          p.m.position.x += p.vx*dt; p.m.position.y += p.vy*dt; p.m.position.z += p.vz*dt;
+          if(p.m.position.y<.06 && p.vy<0){ p.m.position.y=.06; p.vy*=-.45; p.vx*=.7; p.vz*=.7; }  // soft ground bounce
+          const a=1-k*k; p.m.scale.setScalar(p.s*Math.max(.001,a)); p.m.material.opacity=a;
+        }
+        f.ring.scale.setScalar(.5+k*3.2); f.ring.material.opacity=.9*(1-k)*(1-k);
+      }
+      if(f.t>=f.life){
+        world.remove(f.g);
+        if(f.mats) f.mats.forEach(m=>m.dispose());   // popped items keep their shared cached materials
+        fxList.splice(i,1);
+      }
+    }
   }
 
   function checkMission(){
@@ -6369,7 +6426,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       }
     } else if(mission.type==='collect'){
       items.children.slice().forEach(it=>{ if(Math.hypot(p.x-it.position.x,p.z-it.position.z)<1.9){
-        items.remove(it); missionCtx.collected++; sfxPick(); spark(it.position.x,it.position.z); updateGoal();
+        popItem(it); missionCtx.collected++; sfxPick(); spark(it.position.x,it.position.z,SPARK_TINT[mission.item]); punchCam(.6); updateGoal();
         celebrate(playerRig, .9, true);
         const now=performance.now(); missionCtx.combo=(now-missionCtx.comboT<2600)?missionCtx.combo+1:1; missionCtx.comboT=now;
         if(missionCtx.collected>=missionCtx.target) winMission();
