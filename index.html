@@ -77,10 +77,78 @@
   .subTitle { font-size: 16px; color: #17506b; font-weight: 700; text-align: center; margin: 0 0 16px; }
 
   .playBtn { border: none; cursor: pointer; font-family: inherit; font-weight: 900; color: #fff;
-    font-size: 26px; padding: 18px 46px; border-radius: 26px;
+    font-size: 26px; padding: 18px 46px; border-radius: 26px; position: relative;
     background: linear-gradient(160deg, #4bd15e, #2ba341); box-shadow: 0 8px 0 #1f7d33, 0 12px 22px rgba(0,0,0,.3);
     margin: 10px 0; transition: transform .08s; }
   .playBtn:active { transform: translateY(3px); box-shadow: 0 5px 0 #1f7d33, 0 8px 16px rgba(0,0,0,.3); }
+  /* a soft gold pulse ring beckons "tap here" without touching the button's own
+     transform/shadow (so :active press-down still works) */
+  .playBtn::after { content: ''; position: absolute; inset: -3px; border-radius: 29px; pointer-events: none;
+    animation: pbGlow 2.3s ease-out 1.7s infinite; }
+  @keyframes pbGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(255,210,26,.55); opacity: 1; }
+    75%  { box-shadow: 0 0 0 15px rgba(255,210,26,0); opacity: 1; }
+    100% { box-shadow: 0 0 0 15px rgba(255,210,26,0); opacity: 0; } }
+
+  /* ---------- Start-screen scenery: sun, drifting clouds, rolling meadow ----------
+     Pure decoration behind the content (z-index:-1 keeps it above the screen gradient
+     but under every control). Clouds drift in place (alternate) so a frozen keyframe
+     timeline still shows them on screen instead of parked at an off-screen 0% pose. */
+  #skyDecor { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
+  #sunDisc { position: absolute; top: -64px; right: -56px; width: 185px; height: 185px; border-radius: 50%;
+    background: radial-gradient(circle at 42% 42%, #fffbe8 0%, #ffeb9a 55%, #ffd21a 100%);
+    box-shadow: 0 0 70px 32px rgba(255,226,130,.55); }
+  #sunRays { position: absolute; top: -155px; right: -147px; width: 370px; height: 370px; border-radius: 50%;
+    background: repeating-conic-gradient(rgba(255,238,160,.30) 0 9deg, rgba(255,238,160,0) 9deg 24deg);
+    -webkit-mask: radial-gradient(circle, rgba(0,0,0,.9) 0%, transparent 66%);
+    mask: radial-gradient(circle, rgba(0,0,0,.9) 0%, transparent 66%);
+    animation: sunSpin 80s linear infinite; }
+  @keyframes sunSpin { to { transform: rotate(360deg); } }
+  .cl { position: absolute; width: 120px; height: 36px; background: #fff; border-radius: 999px;
+    animation: clDrift 9s ease-in-out infinite alternate; }
+  .cl::before, .cl::after { content: ''; position: absolute; background: #fff; border-radius: 50%; }
+  .cl::before { width: 52px; height: 52px; left: 20px; top: -25px; }
+  .cl::after { width: 36px; height: 36px; right: 22px; top: -15px; }
+  .c1 { left: 4%; top: 9%; opacity: .9; }
+  .c2 { left: 76%; top: 21%; transform: scale(1.15); opacity: .8; animation-duration: 12s; animation-delay: -4s; }
+  .c3 { left: 12%; top: 42%; transform: scale(.55); opacity: .6; animation-duration: 15s; animation-delay: -8s; }
+  @keyframes clDrift { from { margin-left: -22px; } to { margin-left: 22px; } }
+  #hillBack, #hillFront { position: absolute; left: 50%; border-radius: 50%; }
+  #hillBack { width: max(170vw, 1100px); height: max(54vw, 420px); bottom: calc(-1 * max(38vw, 255px));
+    transform: translateX(-56%); background: linear-gradient(180deg, #bce4a6 0%, #a5d691 60%); }
+  #hillFront { width: max(200vw, 1300px); height: max(56vw, 430px); bottom: calc(-1 * max(45vw, 300px));
+    transform: translateX(-44%);
+    background-image:
+      radial-gradient(circle 3px at 39.5% 7%, #ffd21a 2.6px, transparent 3px),
+      radial-gradient(circle 8px at 39.5% 7%, #fff 7px, transparent 8px),
+      radial-gradient(circle 2.5px at 42.5% 13%, #ffd21a 2.1px, transparent 2.5px),
+      radial-gradient(circle 6px at 42.5% 13%, #fff 5px, transparent 6px),
+      radial-gradient(circle 3px at 61% 9%, #ffd21a 2.6px, transparent 3px),
+      radial-gradient(circle 8px at 61% 9%, #fff 7px, transparent 8px),
+      linear-gradient(180deg, #9bd07f 0%, #87c06c 70%); }
+  /* grounding vignette so the cast reads as standing IN the panel, not pasted on it */
+  #heroWrap::after { content: ''; position: absolute; inset: 0; border-radius: 22px; pointer-events: none;
+    box-shadow: inset 0 -28px 30px -18px rgba(55,105,55,.28), inset 0 16px 24px -20px rgba(255,255,255,.85); }
+
+  /* one-shot start-screen entrance (same deliberate CSS exception as the win card and map
+     cards); JS adds .settled shortly after to guarantee the final state even if the
+     timeline is frozen or skipped */
+  #startScreen .bigTitle { animation: seDrop .55s cubic-bezier(.22,1.1,.36,1) both; }
+  #startScreen .subTitle { animation: seUp .45s .10s ease-out both; }
+  #startScreen #heroWrap { animation: seUp .55s .16s cubic-bezier(.22,1.1,.36,1) both; }
+  #startScreen #ageLabel { animation: seUp .4s .26s ease-out both; }
+  #startScreen #ages     { animation: seUp .4s .30s ease-out both; }
+  #startScreen #nameInput{ animation: seUp .4s .34s ease-out both; }
+  #startScreen .playBtn  { animation: seUp .5s .40s cubic-bezier(.22,1.1,.36,1) both; }
+  @keyframes seDrop { from { opacity: 0; transform: translateY(-24px) scale(.92); } }
+  @keyframes seUp   { from { opacity: 0; transform: translateY(16px); } }
+  #startScreen.settled :is(.bigTitle, .subTitle, #heroWrap, #ageLabel, #ages, #nameInput, .playBtn) {
+    animation: none; opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    #startScreen .bigTitle, #startScreen .subTitle, #startScreen #heroWrap, #startScreen #ageLabel,
+    #startScreen #ages, #startScreen #nameInput, #startScreen .playBtn,
+    .playBtn::after, .cl, #sunRays { animation: none; }
+  }
 
   #ages { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 4px; }
   .ageChip { border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 15px;
@@ -210,6 +278,11 @@
 
 <!-- Start screen -->
 <div class="screen show" id="startScreen">
+  <div id="skyDecor" aria-hidden="true">
+    <div id="sunRays"></div><div id="sunDisc"></div>
+    <i class="cl c1"></i><i class="cl c2"></i><i class="cl c3"></i>
+    <div id="hillBack"></div><div id="hillFront"></div>
+  </div>
   <div class="bigTitle">✝️ Bible Adventures</div>
   <div class="subTitle">Explore God's world and live the great Bible stories!</div>
   <div id="heroWrap"><canvas id="heroCanvas"></canvas></div>
@@ -6441,8 +6514,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     window.addEventListener('resize', ()=>{ if(built) size(); });
   })();
 
+  // start-screen entrance: replay the one-shot stagger, and guarantee the final state
+  // shortly after even if the CSS timeline is frozen or skipped (same belt-and-braces
+  // pattern as renderMap's .settled)
+  const startScr=document.getElementById('startScreen');
+  function startEnter(){ startScr.classList.remove('settled'); void startScr.offsetWidth;
+    clearTimeout(startEnter._t); startEnter._t=setTimeout(()=>startScr.classList.add('settled'), 1050); }
+  startEnter();
   document.getElementById('playBtn').onclick=()=>{ initAudio(); openMap(); };
-  document.getElementById('mapBack').onclick=()=>showScreen('startScreen');
+  document.getElementById('mapBack').onclick=()=>{ showScreen('startScreen'); startEnter(); };
   document.getElementById('backBtn').onclick=()=>{ won=false; openMap(); };
   document.getElementById('winMap').onclick=()=>{ document.getElementById('winCard').classList.remove('show'); won=false; openMap(); };
   document.getElementById('winNext').onclick=()=>{ document.getElementById('winCard').classList.remove('show');
