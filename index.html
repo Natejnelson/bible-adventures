@@ -4761,7 +4761,37 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(vol||.5,t+.012); g.gain.exponentialRampToValueAtTime(.001,t+dur);
     o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.03); }
   const sfxPick =()=>{initAudio();tone(659,0,.1,'triangle',.5);tone(988,.06,.13,'sine',.35);};
-  const sfxStep =()=>{initAudio();[523,659,784].forEach((f,i)=>tone(f,i*.06,.14,'triangle',.4));};
+
+  // ---------- Footsteps (per-surface, fired by the walk cycle so the audio can't skate) ----------
+  // Tiny filtered-noise scuffs (~50-150ms) sitting well under the pickup chimes: grass thuds,
+  // sand shuffles, stone taps with a little knock, shallows splash. Surface comes from the
+  // biome's ground palette + inWater(). Follows the 🎵 toggle like the ambience does.
+  let stepN=0;                                        // counts every footfall — headless checks assert on this
+  function stepBurst(fType,freq,q,vol,dur){
+    const t=audioCtx.currentTime;
+    const src=audioCtx.createBufferSource(); src.buffer=ambBuffer(); src.playbackRate.value=.9+Math.random()*.25;
+    const f=audioCtx.createBiquadFilter(); f.type=fType; f.frequency.value=freq*(.86+Math.random()*.28); if(q) f.Q.value=q;
+    const g=audioCtx.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t, Math.random()*2.5); src.stop(t+dur+.02);   // random offset into the noise loop — no two steps identical
+  }
+  function footSurf(){
+    if(!player) return 'grass';
+    if(inWater(player.position.x, player.position.z)) return 'water';
+    const g=currentEnv&&currentEnv.ground;
+    if(g===SAND||g===SEABED||g===KEMET||g===JPLAIN||g===FIELD) return 'sand';
+    if(g===COBBLE||g===MARBLE||g===SCREE||g===GLORY) return 'stone';
+    return 'grass';
+  }
+  function sfxFoot(sp01){
+    stepN++;
+    if(!musicOn||!audioCtx) return;                   // 🎵 off silences steps too — it's THE mute
+    const v=.3+.7*sp01, s=footSurf();
+    if(s==='water'){ stepBurst('bandpass',1400,1.1,.15*v,.15); stepBurst('lowpass',420,0,.10*v,.08); }
+    else if(s==='sand'){ stepBurst('bandpass',880,.8,.11*v,.11); }
+    else if(s==='stone'){ stepBurst('bandpass',2100,1.5,.09*v,.045); tone(138+Math.random()*26,0,.05,'sine',.13*v); }
+    else { stepBurst('lowpass',430,0,.13*v,.07); }    // grass: soft low thud
+  }
   const sfxWin  =()=>{initAudio();[523,659,784,1047,784,1047,1319].forEach((f,i)=>{tone(f,i*.11,.24,'triangle',.5);tone(f*2,i*.11+.02,.18,'sine',.18);});};
   const sfxStar =(n)=>{initAudio();const b=[659,784,988][n]||988;tone(b,0,.2,'triangle',.55);tone(b*1.5,.05,.22,'sine',.3);};
   const sfxCombo=(n)=>{initAudio();const b=523+n*90;tone(b,0,.12,'square',.4);tone(b*1.5,.06,.14,'triangle',.3);};
@@ -5819,6 +5849,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     const ampLeg = .30+.52*sp01;
     const stride = 2*Math.sin(Math.max(.2,ampLeg))*1.28;          // arc a 1.28-long leg sweeps per step
     r.phase += Math.PI*spd*dt/Math.max(.6,stride);
+    // footfall: the bob's low point (each π of phase) is the plant — one scuff per step
+    if(playing && r.mb>.35 && sp01>.10){ const si=Math.floor(r.phase/Math.PI);
+      if(r.stepI!==undefined && si!==r.stepI) sfxFoot(sp01);
+      r.stepI=si;
+    } else r.stepI=undefined;
     const sw=Math.sin(r.phase)*ampLeg*r.mb;
     u.legL.rotation.x=sw; u.legR.rotation.x=-sw;
     const asw=Math.sin(r.phase)*(.22+.46*sp01)*r.mb;
@@ -6336,6 +6371,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // "no JS error" is NOT proof the soundbed built — a silent ambience throws nothing at all.
     // This reports what actually got wired so a headless check can assert on it.
     amb: ()=>({ on:ambOn, nodes:ambNodes.length, timers:ambTimers.length, ctx:audioCtx?audioCtx.state:null }),
+    foot: ()=>({ n:stepN, surf:footSurf() }),   // footfall count + current surface (audio itself can't screenshot)
     fx: ()=>{ const bu=fxList.find(f=>f.kind==='burst');
       return { n:fxList.length, punch:+camPunch.toFixed(3), kinds:fxList.map(f=>f.kind+':'+f.t.toFixed(2)),
         p0: bu?bu.parts[0].m.getWorldPosition(new THREE.Vector3()).toArray().map(n=>+n.toFixed(2)):null,
