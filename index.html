@@ -1226,18 +1226,23 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
             'vec3 bqCol = mix(uShallow, uDeep, bqDeep);',
             // irregular fringe so the foam line wanders instead of tracing the geometry
             'float bqFr = sin(vWPos.x*1.7 + vWPos.z*1.3 + uTime*1.2)*0.5 + sin(vWPos.x*0.9 - vWPos.z*1.9 - uTime*0.8)*0.5;',
-            'float bqFoam = 1.0 - smoothstep(0.05, 1.35, bqSd + bqFr*0.4);',
+            // streams are narrow, so their foam band tightens further to keep open water mid-channel
+            'float bqFw = uMode > 1.5 ? 0.38 : 1.0;',
+            'float bqFoam = 1.0 - smoothstep(0.03, 0.65*bqFw + 0.05, bqSd + bqFr*0.26*bqFw);',
             // a second lapping foam line that slides in and out from the beach
-            'float bqLap = 1.1 + 0.7*sin(uTime*0.85 + vWPos.x*0.23 + vWPos.z*0.19);',
-            'bqFoam += (1.0 - smoothstep(0.0, 0.30, abs(bqSd - bqLap + bqFr*0.18))) * 0.7;',
+            'float bqLap = (0.7 + 0.45*sin(uTime*0.85 + vWPos.x*0.23 + vWPos.z*0.19)) * bqFw;',
+            'bqFoam += (1.0 - smoothstep(0.0, 0.16, abs(bqSd - bqLap + bqFr*0.14))) * 0.55;',
             // storm whitecaps: foam streaking off the crests of the big rollers, torn up by the wind
             'float bqCr = sin(vWPos.x*0.21 + vWPos.z*0.30 + uTime*1.6);',
             'float bqCap = uStorm * smoothstep(0.45, 1.0, bqCr) * (0.5 + 0.5*sin(vWPos.x*2.2 + vWPos.z*1.8 + uTime*2.6)) * smoothstep(1.0, 6.0, bqSd);',
-            'bqFoam = clamp(bqFoam + bqCap*0.85, 0.0, 1.0) * (0.78 + 0.22*sin(uTime*2.3 + vWPos.x*3.1 + vWPos.z*2.7));',
-            'bqCol = mix(bqCol, vec3(0.97, 0.99, 1.0), bqFoam*0.9);',
+            'bqFoam = clamp(bqFoam + bqCap*0.85, 0.0, 1.0) * (0.72 + 0.28*sin(uTime*2.3 + vWPos.x*3.1 + vWPos.z*2.7));',
+            'bqCol = mix(bqCol, vec3(0.97, 0.99, 1.0), bqFoam*0.85);',
+            // sun-glitter: sparse drifting glints where the ripple trains cross, open water only
+            'float bqTw = sin(vWPos.x*2.9 + uTime*2.1) * sin(vWPos.z*3.7 - uTime*1.7) * sin((vWPos.x + vWPos.z)*1.6 + uTime*2.9);',
+            'bqCol += vec3(0.30, 0.34, 0.36) * smoothstep(0.80, 0.97, bqTw) * (1.0 - bqFoam) * smoothstep(0.3, 1.4, bqSd) * (1.0 - uStorm*0.6);',
             'float bqA = mix(0.52, 0.88, bqDeep);',
-            'bqA = max(bqA, bqFoam*0.95);',
-            'bqA *= smoothstep(-0.35, 0.45, bqSd);',
+            'bqA = max(bqA, bqFoam*0.88);',
+            'bqA *= smoothstep(-0.25, 0.40, bqSd);',
             'vec4 diffuseColor = vec4( bqCol, bqA );'
           ].join('\n'))
           .replace('#include <normal_fragment_maps>', [
