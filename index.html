@@ -174,6 +174,37 @@
   #nameInput:focus { border-color: #ffd21a; }
   #nameInput::placeholder { color:#8fb0c4; font-weight:700; }
 
+  /* ---------- Map-screen scenery: the journey crosses a real landscape ----------
+     position:fixed (not absolute) because the map scrolls: the sky, sun and meadow hold
+     still while the trail of cards travels past, which is what sells "road through a
+     land" instead of "list on a gradient". z-index:-1 keeps it under every card. */
+  #mapDecor { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
+  #mSunDisc { position: absolute; top: -74px; left: -66px; width: 175px; height: 175px; border-radius: 50%;
+    background: radial-gradient(circle at 42% 42%, #fffbe8 0%, #ffeb9a 55%, #ffd21a 100%);
+    box-shadow: 0 0 70px 32px rgba(255,226,130,.5); }
+  #mSunRays { position: absolute; top: -160px; left: -152px; width: 350px; height: 350px; border-radius: 50%;
+    background: repeating-conic-gradient(rgba(255,238,160,.28) 0 9deg, rgba(255,238,160,0) 9deg 24deg);
+    -webkit-mask: radial-gradient(circle, rgba(0,0,0,.9) 0%, transparent 66%);
+    mask: radial-gradient(circle, rgba(0,0,0,.9) 0%, transparent 66%);
+    animation: sunSpin 80s linear infinite; }
+  #mapDecor .cl.m1 { left: 72%; top: 12%; opacity: .85; }
+  #mapDecor .cl.m2 { left: 6%; top: 24%; transform: scale(.6); opacity: .55; animation-duration: 13s; animation-delay: -5s; }
+  #mapDecor .cl.m3 { left: 78%; top: 38%; transform: scale(.5); opacity: .45; animation-duration: 16s; animation-delay: -9s; }
+  #mapHillB, #mapHillF { position: absolute; left: 50%; border-radius: 50%; }
+  #mapHillB { width: max(180vw, 1150px); height: max(52vw, 400px); bottom: calc(-1 * max(36vw, 240px));
+    transform: translateX(-58%); background: linear-gradient(180deg, #c2e6aa 0%, #a9d893 60%); }
+  #mapHillF { width: max(205vw, 1320px); height: max(56vw, 430px); bottom: calc(-1 * max(44vw, 292px));
+    transform: translateX(-42%);
+    background-image:
+      radial-gradient(circle 3px at 34% 8%, #ffd21a 2.6px, transparent 3px),
+      radial-gradient(circle 8px at 34% 8%, #fff 7px, transparent 8px),
+      radial-gradient(circle 2.5px at 58% 12%, #ffd21a 2.1px, transparent 2.5px),
+      radial-gradient(circle 6px at 58% 12%, #fff 5px, transparent 6px),
+      radial-gradient(circle 3px at 71% 6%, #ffd21a 2.6px, transparent 3px),
+      radial-gradient(circle 8px at 71% 6%, #fff 7px, transparent 8px),
+      linear-gradient(180deg, #9bd07f 0%, #87c06c 70%); }
+  @media (prefers-reduced-motion: reduce) { #mSunRays { animation: none; } }
+
   /* Mission trail — the level list reads as a journey down a dotted path, not a menu.
      A white dotted line runs down the icon column and shows in the gaps between cards,
      stitching the adventures into one road from Creation to the Shining City. */
@@ -309,6 +340,11 @@
 
 <!-- Mission map -->
 <div class="screen" id="mapScreen">
+  <div id="mapDecor">
+    <div id="mSunRays"></div><div id="mSunDisc"></div>
+    <div class="cl m1"></div><div class="cl m2"></div><div class="cl m3"></div>
+    <div id="mapHillB"></div><div id="mapHillF"></div>
+  </div>
   <div id="topBar">
     <button class="topBtn" id="mapBack">◀ Back</button>
     <button class="topBtn" id="musicChip">🎵 Music: On</button>
