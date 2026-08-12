@@ -4792,7 +4792,50 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     else if(s==='stone'){ stepBurst('bandpass',2100,1.5,.09*v,.045); tone(138+Math.random()*26,0,.05,'sine',.13*v); }
     else { stepBurst('lowpass',430,0,.13*v,.07); }    // grass: soft low thud
   }
-  const sfxWin  =()=>{initAudio();[523,659,784,1047,784,1047,1319].forEach((f,i)=>{tone(f,i*.11,.24,'triangle',.5);tone(f*2,i*.11+.02,.18,'sine',.18);});};
+  // ---------- Win fanfare + UI clicks ----------
+  // The win used to be a bare arpeggio of beeps. Now it lands like something earned: a short
+  // G-major lift resolving onto a long C-major pad, the melody riding on top, a held high note
+  // ringing out, and a high noise shimmer that opens with the confetti. Star chimes (sfxStar)
+  // still layer over it at .35/.78/1.21s — E/G/B over the C pad, deliberately consonant.
+  function sfxWin(){
+    initAudio(); if(!musicOn||!audioCtx) return;
+    const t=audioCtx.currentTime;
+    const pad=(f,st,dur,vol)=>{ const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type='triangle'; o.frequency.value=f;
+      g.gain.setValueAtTime(.0001,t+st); g.gain.linearRampToValueAtTime(vol,t+st+dur*.3);
+      g.gain.exponentialRampToValueAtTime(.001,t+st+dur);
+      o.connect(g); g.connect(master); o.start(t+st); o.stop(t+st+dur+.05); };
+    [196,246.9,392].forEach(f=>pad(f,0,.5,.15));             // the lift...
+    [130.8,261.6,329.6,392].forEach(f=>pad(f,.42,1.7,.19));  // ...resolves onto a long warm glow
+    [523,659,784,1047,1319].forEach((f,i)=>{ tone(f,.46+i*.09,.30,'triangle',.42); tone(f*2,.48+i*.09,.20,'sine',.13); });
+    tone(1047,.92,.9,'sine',.20);                            // the top note rings out
+    const src=audioCtx.createBufferSource(); src.buffer=ambBuffer();
+    const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=5200;
+    const g=audioCtx.createGain(); g.gain.setValueAtTime(.0001,t+.4);
+    g.gain.linearRampToValueAtTime(.09,t+.62); g.gain.exponentialRampToValueAtTime(.0008,t+1.8);
+    src.connect(hp); hp.connect(g); g.connect(master); src.start(t+.4,Math.random()*2); src.stop(t+1.9);
+  }
+  // Every button answers the finger: a soft noise tap + tiny blip. Back-buttons tick lower so
+  // navigation has a direction, launching a level lifts, and a locked level gives a gentle
+  // "not yet" double-thump. Follows the 🎵 toggle like the footsteps do.
+  let clickN=0, lastClick='';
+  function sfxClick(kind){
+    clickN++; lastClick=kind;
+    initAudio(); if(!musicOn||!audioCtx) return;
+    if(kind==='locked'){ tone(180,0,.09,'sine',.22); tone(150,.10,.12,'sine',.18); return; }
+    const back = kind==='back';
+    stepBurst('bandpass', back?1500:2500, 1.4, .085, .035);
+    tone(back?520:880, 0, .045, 'sine', .12);
+    if(kind==='go'){ tone(660,.02,.08,'triangle',.20); tone(990,.09,.12,'sine',.16); }
+  }
+  document.addEventListener('pointerdown', e=>{
+    const b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if(!b) return;
+    const kind = b.classList.contains('locked') ? 'locked'
+      : (b.classList.contains('mCard')||b.id==='playBtn'||b.id==='winNext') ? 'go'
+      : (b.id==='mapBack'||b.id==='backBtn'||b.id==='winMap') ? 'back' : 'tick';
+    sfxClick(kind);
+  }, {passive:true});
   const sfxStar =(n)=>{initAudio();const b=[659,784,988][n]||988;tone(b,0,.2,'triangle',.55);tone(b*1.5,.05,.22,'sine',.3);};
   const sfxCombo=(n)=>{initAudio();const b=523+n*90;tone(b,0,.12,'square',.4);tone(b*1.5,.06,.14,'triangle',.3);};
 
@@ -6372,6 +6415,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // This reports what actually got wired so a headless check can assert on it.
     amb: ()=>({ on:ambOn, nodes:ambNodes.length, timers:ambTimers.length, ctx:audioCtx?audioCtx.state:null }),
     foot: ()=>({ n:stepN, surf:footSurf() }),   // footfall count + current surface (audio itself can't screenshot)
+    ui: ()=>({ n:clickN, last:lastClick }),     // button-press count + last click kind (same idea, for the UI layer)
     fx: ()=>{ const bu=fxList.find(f=>f.kind==='burst');
       return { n:fxList.length, punch:+camPunch.toFixed(3), kinds:fxList.map(f=>f.kind+':'+f.t.toFixed(2)),
         p0: bu?bu.parts[0].m.getWorldPosition(new THREE.Vector3()).toArray().map(n=>+n.toFixed(2)):null,
