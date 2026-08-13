@@ -266,9 +266,12 @@
     background: radial-gradient(circle at 50% 40%, #fffef8 0%, #ffeec2 55%, #ffd98f 100%);
     transition: opacity .34s ease .14s; }
   #mapWash.on { opacity: 1; }
+  /* the return direction: after the swap the wash FALLS (no delay, a touch slower) so the
+     map's card stagger emerges out of the same light the mission dissolved into */
+  #mapWash.fall { transition: opacity .5s ease; }
   @media (prefers-reduced-motion: reduce) {
     #missionList .mCard, .mCard.next .mIcon { animation: none; }
-    #mapScreen.leaving #missionList .mCard, #mapWash { transition: none; }
+    #mapScreen.leaving #missionList .mCard, #mapWash, #mapWash.fall { transition: none; }
   }
   #topBar { width: 100%; max-width: 560px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .topBtn { border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 15px; color: #fff;
@@ -289,8 +292,14 @@
     100% { transform: scale(1) translateY(0);      opacity: 1; }
   }
   #winCard.show .winInner { animation: winPop .42s cubic-bezier(.22,1.1,.36,1) both; animation-delay: .06s; }
+  /* leaving the win card: scrim clears and the card sinks while #mapWash (one layer below)
+     rises — the win moment melts into the same light that carries every scene change */
+  #winCard.leaving { animation: none; background: rgba(10,20,40,0); transition: background .32s ease; }
+  #winCard.leaving .winInner { animation: none; opacity: 0; transform: scale(.92) translateY(14px);
+    transition: opacity .32s ease, transform .32s ease; }
   @media (prefers-reduced-motion: reduce) {
     #winCard.show, #winCard.show .winInner { animation: none; }
+    #winCard.leaving, #winCard.leaving .winInner { transition: none; }
   }
   .winInner { background: #fff; border-radius: 26px; padding: 22px 20px; max-width: 420px; width: 100%;
     text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
@@ -6701,10 +6710,34 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(mapLeaving) return; mapLeaving=true;
     const scr=document.getElementById('mapScreen'), wash=document.getElementById('mapWash');
     scr.classList.add('leaving'); card.classList.add('launch');
-    wash.style.display='block'; void wash.offsetWidth; wash.classList.add('on');
+    wash.classList.remove('fall'); wash.style.display='block'; void wash.offsetWidth; wash.classList.add('on');
     setTimeout(()=>{ mapLeaving=false; scr.classList.remove('leaving');
       wash.classList.remove('on'); wash.style.display='none';
       won=false; startMission(i); }, 500);
+  }
+
+  // world/win → map: the same light, the other direction. The win card melts (scrim clears,
+  // card sinks) while the wash rises behind it; the map is rebuilt behind full light, then the
+  // wash falls as the cards stagger in. Also used by the in-game Back button (no card showing —
+  // the wash simply rises over the world). mapLeaving stays true until the fall finishes, so
+  // card taps / Back during the transition are ignored.
+  function washToMap(){
+    if(mapLeaving) return; mapLeaving=true;
+    const wc=document.getElementById('winCard'), wash=document.getElementById('mapWash');
+    if(wc.classList.contains('show')) wc.classList.add('leaving');
+    wash.classList.remove('fall'); wash.style.display='block'; void wash.offsetWidth; wash.classList.add('on');
+    // swap when the rise actually FINISHES (a lagging frame mustn't let the map pop in behind
+    // a half-risen wash); the timeout is only a fallback for reduced-motion / frozen timelines
+    let swapped=false;
+    const swap=()=>{ if(swapped) return; swapped=true;
+      wash.removeEventListener('transitionend', swap);
+      wc.classList.remove('show'); wc.classList.remove('leaving');
+      won=false; openMap();
+      wash.classList.add('fall'); wash.classList.remove('on');
+      setTimeout(()=>{ wash.classList.remove('fall'); wash.style.display='none'; mapLeaving=false; }, 540);
+    };
+    wash.addEventListener('transitionend', swap);
+    setTimeout(swap, 700);
   }
 
 
@@ -6777,10 +6810,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   startEnter();
   document.getElementById('playBtn').onclick=()=>{ initAudio(); openMap(); };
   document.getElementById('mapBack').onclick=()=>{ if(mapLeaving) return; showScreen('startScreen'); startEnter(); };
-  document.getElementById('backBtn').onclick=()=>{ won=false; openMap(); };
-  document.getElementById('winMap').onclick=()=>{ document.getElementById('winCard').classList.remove('show'); won=false; openMap(); };
-  document.getElementById('winNext').onclick=()=>{ document.getElementById('winCard').classList.remove('show');
-    const ni=(missionCtx.index+1); if(ni<MISSIONS.length && isUnlocked(ni)){ won=false; startMission(ni); } else { won=false; openMap(); } };
+  document.getElementById('backBtn').onclick=()=>washToMap();
+  document.getElementById('winMap').onclick=()=>washToMap();
+  document.getElementById('winNext').onclick=()=>{ const ni=(missionCtx.index+1);
+    if(ni<MISSIONS.length && isUnlocked(ni)){ document.getElementById('winCard').classList.remove('show'); won=false; startMission(ni); }
+    else washToMap(); };
   const vChip=document.getElementById('voiceChip');
   function syncVoice(){ vChip.textContent = voiceOn?'🔊 Voice: On':'🔇 Voice: Off'; }
   syncVoice();
