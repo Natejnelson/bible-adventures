@@ -251,8 +251,24 @@
     width: 0; transition: width .6s cubic-bezier(.22,1.1,.36,1); }
   #mapProgTxt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 900; color: #17506b; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
+  /* Map-leave: the tapped card lifts and glows, the rest melt down the road, and a wash of
+     light rises — the SAME gradient as #introFade, so the mission's flash-reveal fades out of
+     the identical pixels and map→world reads as one continuous moment. Class-triggered
+     transitions, not keyframes; automation enters via ?debug=1&m=N and never walks this path. */
+  #mapScreen.leaving #missionList .mCard { animation: none; transition: opacity .34s ease, transform .34s ease; }
+  #mapScreen.leaving #missionList .mCard:not(.launch) { opacity: 0; transform: translateY(18px) scale(.94); }
+  #mapScreen.leaving #missionList .mCard.launch { transform: scale(1.07);
+    box-shadow: 0 0 0 5px #ffd21a, 0 0 34px 10px rgba(255,222,100,.9), 0 12px 26px rgba(0,0,0,.25); }
+  #mapScreen.leaving :is(.bigTitle, #mapProg, #topBar) { transition: opacity .3s ease; opacity: 0; }
+  #mapScreen.leaving #missionList::before { opacity: 0; }
+  #missionList::before { transition: opacity .3s ease; }
+  #mapWash { position: fixed; inset: 0; z-index: 46; pointer-events: none; display: none; opacity: 0;
+    background: radial-gradient(circle at 50% 40%, #fffef8 0%, #ffeec2 55%, #ffd98f 100%);
+    transition: opacity .34s ease .14s; }
+  #mapWash.on { opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     #missionList .mCard, .mCard.next .mIcon { animation: none; }
+    #mapScreen.leaving #missionList .mCard, #mapWash { transition: none; }
   }
   #topBar { width: 100%; max-width: 560px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .topBtn { border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 15px; color: #fff;
@@ -355,6 +371,7 @@
   <div id="mapProg"><div id="mapProgFill"></div><span id="mapProgTxt"></span></div>
   <div id="missionList"></div>
 </div>
+<div id="mapWash"></div>
 
 <!-- Win card -->
 <div id="winCard"><div class="winInner">
@@ -6663,7 +6680,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         +'<div class="mBody"><div class="mName">'+m.name+'</div>'
         +'<div class="mGoalTxt">'+m.goal+'</div>'
         +'<div class="mStars">'+(got>0?'⭐⭐⭐':(isNext?'<span class="mNext">▶ Up next!</span>':(unlocked?'Tap to play!':'Finish the one before to unlock')))+'</div></div>';
-      if(unlocked) c.onclick=()=>{ won=false; startMission(i); };
+      if(unlocked) c.onclick=()=>mapLaunch(c,i);
       if(isNext){ nextEl=c; nextIdx=i; }
       list.appendChild(c); });
     // guarantee the final state even if the entrance animation is skipped or frozen
@@ -6672,7 +6689,23 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     // a returning kid lands on their next adventure, not on 30 finished cards to scroll past
     if(nextEl && nextIdx>3) setTimeout(()=>{ try{ nextEl.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){} }, 80);
   }
-  function openMap(){ showScreen('mapScreen'); renderMap(); }
+  function openMap(){ const s=document.getElementById('mapScreen'); s.classList.remove('leaving');
+    showScreen('mapScreen'); renderMap(); }
+
+  // map → world: the tapped card lifts, the road melts away, light washes up, and startMission's
+  // #introFade (identical gradient) takes over before the next paint — one continuous moment.
+  // startMission runs synchronously inside the timeout, so the heavy world build happens while
+  // the screen is already fully washed in light; the kid never sees a frozen half-state.
+  let mapLeaving=false;
+  function mapLaunch(card, i){
+    if(mapLeaving) return; mapLeaving=true;
+    const scr=document.getElementById('mapScreen'), wash=document.getElementById('mapWash');
+    scr.classList.add('leaving'); card.classList.add('launch');
+    wash.style.display='block'; void wash.offsetWidth; wash.classList.add('on');
+    setTimeout(()=>{ mapLeaving=false; scr.classList.remove('leaving');
+      wash.classList.remove('on'); wash.style.display='none';
+      won=false; startMission(i); }, 500);
+  }
 
 
   // ---- home screen: the real characters, alive, so the first thing you see is the cast ----
@@ -6743,7 +6776,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     clearTimeout(startEnter._t); startEnter._t=setTimeout(()=>startScr.classList.add('settled'), 1050); }
   startEnter();
   document.getElementById('playBtn').onclick=()=>{ initAudio(); openMap(); };
-  document.getElementById('mapBack').onclick=()=>{ showScreen('startScreen'); startEnter(); };
+  document.getElementById('mapBack').onclick=()=>{ if(mapLeaving) return; showScreen('startScreen'); startEnter(); };
   document.getElementById('backBtn').onclick=()=>{ won=false; openMap(); };
   document.getElementById('winMap').onclick=()=>{ document.getElementById('winCard').classList.remove('show'); won=false; openMap(); };
   document.getElementById('winNext').onclick=()=>{ document.getElementById('winCard').classList.remove('show');
