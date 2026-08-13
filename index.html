@@ -807,11 +807,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
   // ground = one smooth organic disc (flat top at y=0) with softly-varied vertex colors,
   // plus a separate glossy water mesh. No cubes, no visible grid. Themed per biome.
-  let ground = null, waterInfo = null, waterMesh = null, waterUni = null;
+  let ground = null, waterInfo = null, waterMesh = null, waterUni = null, wadeRings = null;
   const groundGroup = new THREE.Group(); world.add(groundGroup);
   function disposeGroup(g){ while(g.children.length){ const c=g.children[0]; g.remove(c); if(c.geometry)c.geometry.dispose(); if(c.material)c.material.dispose(); } }
   function buildGround(){
-    disposeGroup(groundGroup); waterMesh = null; waterUni = null;
+    disposeGroup(groundGroup); waterMesh = null; waterUni = null; wadeRings = null;
     const env = currentEnv || {};
     const pal = env.ground || [0x62c257,0x57bd50,0x6bcc5f,0x4fae48];
     const wmode = env.water || null, wc = env.waterColor || 0x3aa0e8;
@@ -1306,6 +1306,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         wm = new THREE.Mesh(wGeo, water); wm.rotation.y = -Math.PI/4; wm.position.set(0,WY,0);
       }
       wm.renderOrder=1; groundGroup.add(wm); waterMesh=wm; waterUni=uni;
+      // wading feedback: a tiny pool of expanding foot-ripple rings, spawned on each footfall
+      // in the shallows (and slowly while standing in them). Transform-only, animated in frame().
+      const rgGeo = new THREE.RingGeometry(0.62, 0.80, 22); rgGeo.rotateX(-Math.PI/2);
+      const rgCol = wCol.clone().lerp(new THREE.Color(0xf4feff), 0.72);
+      wadeRings = [];
+      for(let i=0;i<7;i++){
+        const rg = new THREE.Mesh(rgGeo, new THREE.MeshBasicMaterial({color:rgCol, transparent:true, opacity:0, depthWrite:false}));
+        rg.renderOrder = 2; rg.visible = false; rg.userData.t = -1;
+        groundGroup.add(rg); wadeRings.push(rg);
+      }
     }
   }
   function inWater(x,z){ const w=waterInfo; if(!w||!w.mode) return false;
@@ -1313,6 +1323,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(w.mode==='sea') return z > w.seaZ-0.8;
     if(w.mode==='stream') return Math.abs(x+z) < 3.8;
     return false; }
+  // claim an idle ring from the wading pool: a footfall throws a wide quick ring, standing
+  // water breathes a slow faint one. Night biomes dim them so the unlit ring doesn't glow.
+  function spawnWadeRing(px,pz,step){
+    if(!wadeRings) return;
+    for(const rg of wadeRings){ const d=rg.userData; if(d.t>=0) continue;
+      d.t=0; d.life = step?0.8:1.25; d.max = step?1.5:0.95;
+      d.a0 = (step?0.44:0.26) * ((currentEnv&&currentEnv.night)?0.5:1);
+      rg.position.set(px+(Math.random()-.5)*.18, 0.09, pz+(Math.random()-.5)*.18);
+      rg.scale.setScalar(0.3); rg.visible=true; return; }
+  }
   function randPos(margin){
     let x,z,t=0; margin = margin||3;
     do { x=(Math.random()*2-1)*(WORLD_R-margin); z=(Math.random()*2-1)*(WORLD_R-margin); t++; }
@@ -5961,9 +5981,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     r.phase += Math.PI*spd*dt/Math.max(.6,stride);
     // footfall: the bob's low point (each π of phase) is the plant — one scuff per step
     if(playing && r.mb>.35 && sp01>.10){ const si=Math.floor(r.phase/Math.PI);
-      if(r.stepI!==undefined && si!==r.stepI) sfxFoot(sp01);
+      if(r.stepI!==undefined && si!==r.stepI){ sfxFoot(sp01);
+        // each splashing footfall also throws a visible ripple ring off the shallows
+        if(footSurf()==='water') spawnWadeRing(r.o.position.x, r.o.position.z, true);
+      }
       r.stepI=si;
     } else r.stepI=undefined;
+    // standing in the shallows: the water keeps answering with slow, faint rings
+    r.wadeT=(r.wadeT||0)-dt;
+    if(playing && r.wadeT<=0 && sp01<=.10 && inWater(r.o.position.x, r.o.position.z)){
+      spawnWadeRing(r.o.position.x, r.o.position.z, false);
+      r.wadeT=1.2+Math.random()*.5;
+    }
     const sw=Math.sin(r.phase)*ampLeg*r.mb;
     u.legL.rotation.x=sw; u.legR.rotation.x=-sw;
     const asw=Math.sin(r.phase)*(.22+.46*sp01)*r.mb;
@@ -6238,6 +6267,14 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
     // water animates in its shader — just advance the ripple/foam clock (no per-vertex CPU work)
     if(waterUni) waterUni.uTime.value = T;
+    // wading rings ripple outward and fade (ease-out growth, linear fade back into the pool)
+    if(wadeRings) for(const rg of wadeRings){ const d=rg.userData; if(d.t<0) continue;
+      d.t+=dt; const k=d.t/d.life;
+      if(k>=1){ d.t=-1; rg.visible=false; continue; }
+      const e=1-(1-k)*(1-k);
+      rg.scale.setScalar(0.3 + d.max*e);
+      rg.material.opacity = d.a0*(1-k);
+    }
     // ---- redsea biome: the standing walls ripple and churn; fish patrol inside the glass ----
     if(currentEnv && currentEnv.decor==='redsea'){
       rsUni.uTime.value = T;
