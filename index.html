@@ -497,12 +497,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     if(currentEnv && currentEnv.decor==='heaven'){
       // the New Jerusalem needs no sun (Rev 21:23): a star-strewn violet dusk where the
       // warm key light pours OUT of the city itself, up-screen, backlighting the pilgrim's walk
-      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x35225e), 0.5), near||46, far||104);
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0x46307a), 0.42), near||46, far||104);
       starField.visible = true; clouds.visible = false;
-      sun.intensity = 1.0; sun.color.set(0xffd98e);
+      sun.intensity = 1.35; sun.color.set(0xffe6a8);
       sun.position.set(-30, 34, -30);              // golden glory streaming from the gate's diagonal
-      hemi.color.set(0x8a76b4); hemi.groundColor.set(0x6a5438); hemi.intensity = 0.62;
-      ambLight.color.set(0xffe2b0); ambLight.intensity = 0.46;   // the city's own glow fills every shadowed face
+      // "The city has no need of sun or moon, for the glory of God is its light" (Rev 21:23) —
+      // so here AMBIENT is the main light, not the key. It was set at 0.46 with a dark-brown
+      // ground bounce, and the streets of gold came out looking like a mud field on the one
+      // level that is supposed to be the payoff for finishing the whole game.
+      hemi.color.set(0xb9a3e0); hemi.groundColor.set(0xc09a58); hemi.intensity = 0.98;
+      ambLight.color.set(0xfff0cc); ambLight.intensity = 0.78;
       return;
     }
     if(currentEnv && currentEnv.decor==='redsea'){
@@ -522,12 +526,20 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
       // the sun has just cleared the ridge BEHIND the tomb — a low pink-gold key backlights
       // the whole garden up the camera diagonal, mist holds the last cool of the night,
       // and a soft violet fill keeps every shadow gentle instead of black
-      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xdcaabc), 0.36), near||34, far||88);
+      scene.fog = new THREE.Fog(new THREE.Color(hex).lerp(new THREE.Color(0xe8c0cc), 0.30), near||34, far||88);
       starField.visible = false; clouds.visible = false;
-      sun.intensity = 1.1; sun.color.set(0xffc9a0);
-      sun.position.set(-24, 18, -30);              // barely risen — long shadows reach back down the garden path
-      hemi.color.set(0xcab2d8); hemi.groundColor.set(0x4d6a52); hemi.intensity = 0.8;
-      ambLight.color.set(0xffd9c2); ambLight.intensity = 0.34;
+      sun.intensity = 1.28; sun.color.set(0xffd5b0);
+      // The sun WAS at y=18. That is barely-risen and physically right, but a 5-unit cypress
+      // then throws a shadow long enough to cross the whole garden, and Lambert shadows have
+      // no gradient — the result was hard black wedges lying across Easter morning like tears
+      // in the picture. Raised until the shadows are readable; the light still rakes in from
+      // the notch behind the tomb, which is what actually sells the sunrise.
+      sun.position.set(-24, 31, -30);
+      // This is the empty tomb — the brightest news in the book. It had been rendering as
+      // gloom. Shadowed ground on a Lambert material is lit by hemi + ambient ALONE, so those
+      // two are what decide whether a shadow reads as dawn-violet or as a hole.
+      hemi.color.set(0xe4d0ec); hemi.groundColor.set(0x7d9c78); hemi.intensity = 1.06;
+      ambLight.color.set(0xffe6d6); ambLight.intensity = 0.54;
       return;
     }
     if(currentEnv && currentEnv.decor==='furnace'){
@@ -871,6 +883,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
         const akx=Math.cos(AK_A)*(WORLD_R-4), akz=Math.sin(AK_A)*(WORLD_R-4);
         const yd = Math.hypot(x-akx, z-akz);
         if(yd < 14){ const t=1-yd/14; cA.lerp(AK_MUD, Math.min(1, t*1.6)*0.85); }
+      }
+      if(env.decor==='heaven'){                                    // "the great street of the city was of gold,
+        const hp=Math.abs((x-z)*0.7071);                           // as pure as transparent glass" (Rev 21:21).
+        // Without this the final level of the game is an empty tan plain: all of its real
+        // content — wall, gate, skyline, glory shafts — sits up-screen past the play area,
+        // so the whole foreground had nothing in it. The street gives the frame a direction
+        // and puts the gold where the camera actually looks.
+        if(hp < 5.2){ const t=1-hp/5.2; cA.lerp(HV_STREET, Math.min(1, t*1.7)*0.92); }
+        else if(hp < 8.4) cA.lerp(HV_STREET, (1-(hp-5.2)/3.2)*0.34);   // the glow spilling off its edges
       }
       if(env.decor==='elah'){                                      // the valley floor stays green by the
         const wv=Math.abs((x+z)*0.7071);                           // brook; both slopes cure to summer gold
@@ -2206,7 +2227,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
     for(let s=-7;s<=7;s++){
       if(Math.abs(s)<2) continue;                                       // the gate ensemble itself fills the middle
       const a=CA+s*0.16, r=WORLD_R+2.5, wx=Math.cos(a)*r, wz=Math.sin(a)*r;
-      const seg=box(7.6,5.4,1.7, 0xcfe0cc, wx,2.7,wz); seg.rotation.y=-a+Math.PI/2; seg.castShadow=false; decor.add(seg);
+      // jasper reads as a PALE COOL STONE, not the mint-green it was — at this biome's low key
+      // light 0xcfe0cc came out the colour of a dirt berm and flattened the whole horizon
+      const seg=box(7.6,5.4,1.7, 0xeef2ea, wx,2.7,wz); seg.rotation.y=-a+Math.PI/2; seg.castShadow=false; decor.add(seg);
+      // the twelve jewelled foundations (Rev 21:19-20) — the only saturated colour in a scene
+      // that is otherwise entirely gold and pearl, and the thing that makes the wall read as
+      // built rather than piled
+      const jw=new THREE.Mesh(boxGeo, mat(NJ_JEWEL[(s+7)%NJ_JEWEL.length]));
+      jw.scale.set(7.7,1.15,1.85); jw.position.set(wx,0.6,wz); jw.rotation.y=-a+Math.PI/2;
+      jw.castShadow=false; decor.add(jw);
       const crown=new THREE.Mesh(boxGeo, glowGoldM); crown.scale.set(7.8,.42,1.9);
       crown.position.set(wx,5.6,wz); crown.rotation.y=-a+Math.PI/2; decor.add(crown);
       if(s%2===0){ const tw=new THREE.Mesh(ugeo('cylinder'), mat(0xdcead6)); tw.scale.set(1.8,7.6,1.8);
@@ -3192,6 +3221,9 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   //      real journey down a real road, not a stroll across an empty sand disc. ----
   const CY_A = Math.PI*1.25;                       // the road runs up-screen along the camera diagonal
   const CY_ROAD = new THREE.Color(0xdcb587);       // sun-bleached packed dust
+  const HV_STREET = new THREE.Color(0xffe9a6);     // the street of gold running up to the gate (heaven biome)
+  // jasper, sapphire, emerald, topaz, amethyst, beryl — the wall's twelve foundation stones (Rev 21:19-20)
+  const NJ_JEWEL = [0x4fa3c9,0x3f6fc4,0x3fae72,0xd9a53f,0x9a5fc4,0x46c2b0];
   const CY_ROCK=[0xb26847,0xa25c3e,0xc0754f,0x8f5236];   // iron-red canyon sandstone
   let cyHawks=[];
   function cyOnRoad(x,z,m){ return Math.abs(x-z)*0.7071 < (m||3.4); }   // keep the roadway itself clear
@@ -5228,7 +5260,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   const SCREE = [0x9a8c72,0x8b7d65,0xa2957c,0x74805f];   // Sinai high country — sun-baked stone with dry-olive scrub patches
   const CAVE  = [0x776c60,0x6b6156,0x82766a,0x5f564d];   // torch-lit cavern floor — cool stone warmed by firelight
   const BELLY = [0x8f5a68,0x83515f,0x9b6472,0x744a58];   // the great fish's belly floor — wet rose flesh in teal gloom (fish biome)
-  const GLORY = [0xd9c47e,0xe6d494,0xccb46c,0xf0e2ac];   // streets of gold, "like transparent glass" (Rev 21:21)
+  // The city floor: pearl with a violet cast picked up from the sky. Rev 21 makes BOTH the city
+  // and its street gold — but painting both gold is why the street tint was invisible and the
+  // whole level read as one flat tan field. Pearl ground + a gold street keeps the scripture's
+  // materials and gives the eye somewhere to go. (Before 8/17 this was a dull tan that muddied.)
+  const GLORY = [0xdfd7e2,0xece5ec,0xd0c6d4,0xf5f0f4];
   const WETSAND=[0xa89a7c,0x9a8c6e,0xb2a486,0x8b7e62];   // rain-soaked shore under a squall (storm biome)
   const SEABED =[0xb3a686,0xa2967a,0x93987e,0xbcae8e];   // sea floor laid bare — wet sand streaked with algae (redsea biome)
   const SCORCH =[0x4a3c31,0x413429,0x55453a,0x382d24];   // the plain of Dura — ash-gray earth scorched warm around the kiln (furnace biome)
